@@ -1,77 +1,40 @@
 import { neon } from '@neondatabase/serverless';
-import {
-  INITIAL_FICHAS,
-  INITIAL_INSUMOS,
-  INITIAL_MOVIMENTACOES,
-  INITIAL_USER,
-  INITIAL_VENDAS,
-} from '../src/data/mockData';
 
 const APP_STATE_ID = 'cmv-hoteis';
 
-const buildInitialState = () => {
-  const villaMayorInsumos = INITIAL_INSUMOS.map((item) => ({ ...item, unidade: 'AeB Villa Mayor' }));
-  const cumbucoInsumos = INITIAL_INSUMOS.map((item) => ({
-    ...item,
-    id: `${item.id}-cumbuco`,
-    unidade: 'VM Cumbuco',
-  }));
-
-  const villaMayorFichas = INITIAL_FICHAS.map((item) => ({ ...item, unidade: 'AeB Villa Mayor' }));
-  const cumbucoFichas = INITIAL_FICHAS.map((item) => ({
-    ...item,
-    id: `${item.id}-cumbuco`,
-    unidade: 'VM Cumbuco',
-    ingredientes: item.ingredientes.map((ingrediente) => ({
-      ...ingrediente,
-      insumoId: `${ingrediente.insumoId}-cumbuco`,
-    })),
-  }));
-
-  const villaMayorMovimentacoes = INITIAL_MOVIMENTACOES.map((item) => ({ ...item, unidade: 'AeB Villa Mayor' }));
-  const cumbucoMovimentacoes = INITIAL_MOVIMENTACOES.map((item) => ({
-    ...item,
-    id: `${item.id}-cumbuco`,
-    insumoId: `${item.insumoId}-cumbuco`,
-    unidade: 'VM Cumbuco',
-  }));
-
-  const villaMayorVendas = INITIAL_VENDAS.map((item) => ({ ...item, unidade: 'AeB Villa Mayor' }));
-  const cumbucoVendas = INITIAL_VENDAS.map((item) => ({
-    ...item,
-    id: `${item.id}-cumbuco`,
-    fichaId: `${item.fichaId}-cumbuco`,
-    unidade: 'VM Cumbuco',
-  }));
-
-  return {
-    currentUnit: 'AeB Villa Mayor',
-    user: { ...INITIAL_USER, estabelecimento: 'AeB Villa Mayor' },
-    users: [
-      {
-        id: 'user-1',
-        nome: 'Ataide Silveira',
-        email: 'gerenteataide@gmail.com',
-        cargo: 'Gestor',
-        estabelecimento: 'AeB Villa Mayor',
-        metaFCP: 30,
-        senha: '123456',
-      },
-      {
-        id: 'user-2',
-        nome: 'Carlos Souza',
-        email: 'colaborador@vmhoteis.com',
-        cargo: 'Colaborador',
-        estabelecimento: 'AeB Villa Mayor',
-        metaFCP: 30,
-        senha: '123456',
-      },
-    ],
-    allInsumos: [...villaMayorInsumos, ...cumbucoInsumos],
-    allFichas: [...villaMayorFichas, ...cumbucoFichas],
-    allMovimentacoes: [...villaMayorMovimentacoes, ...cumbucoMovimentacoes],
-    allVendas: [...villaMayorVendas, ...cumbucoVendas],
-  };
+const initialState = {
+  currentUnit: 'AeB Villa Mayor',
+  user: {
+    nome: 'Ataide Silveira',
+    email: 'gerenteataide@gmail.com',
+    cargo: 'Gestor',
+    estabelecimento: 'AeB Villa Mayor',
+    metaFCP: 30,
+  },
+  users: [
+    {
+      id: 'user-1',
+      nome: 'Ataide Silveira',
+      email: 'gerenteataide@gmail.com',
+      cargo: 'Gestor',
+      estabelecimento: 'AeB Villa Mayor',
+      metaFCP: 30,
+      senha: '123456',
+    },
+    {
+      id: 'user-2',
+      nome: 'Carlos Souza',
+      email: 'colaborador@vmhoteis.com',
+      cargo: 'Colaborador',
+      estabelecimento: 'AeB Villa Mayor',
+      metaFCP: 30,
+      senha: '123456',
+    },
+  ],
+  allInsumos: [],
+  allFichas: [],
+  allMovimentacoes: [],
+  allVendas: [],
 };
 
 const getSql = () => {
@@ -103,7 +66,6 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json(rows[0].data);
       }
 
-      const initialState = buildInitialState();
       await sql`
         INSERT INTO app_state (id, data)
         VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
