@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useStock } from '../context/StockContext';
-import { Shield, Lock, Eye, EyeOff, Sparkles, LogIn, User, Building, Mail, Award, CheckCircle } from 'lucide-react';
+import { Shield, Lock, Eye, EyeOff, LogIn, User, Building, Mail, CheckCircle } from 'lucide-react';
 
 interface AuthSimProps {
   onLoginSuccess: () => void;
 }
 
 export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
-  const { users, registerUser, updateUser, currentUnit } = useStock();
+  const { users, registerUser, updateUser } = useStock();
   const [email, setEmail] = useState('gerenteataide@gmail.com');
   const [password, setPassword] = useState('123456');
   const [showPassword, setShowPassword] = useState(false);
@@ -70,30 +70,6 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleQuickAccess = (role: 'Gestor' | 'Colaborador') => {
-    setError('');
-    setSuccessMsg('');
-    const targetEmail = role === 'Gestor' ? 'gerenteataide@gmail.com' : 'colaborador@vmhoteis.com';
-    const foundUser = users.find(u => u.email === targetEmail);
-    if (foundUser) {
-      setEmail(targetEmail);
-      setPassword('123456');
-      updateUser(foundUser);
-      onLoginSuccess();
-    } else {
-      // Fallback fallback if not found
-      const fallbackUser = {
-        nome: role === 'Gestor' ? 'Ataíde Silveira' : 'Carlos Souza',
-        email: targetEmail,
-        cargo: role,
-        estabelecimento: currentUnit,
-        metaFCP: 30
-      };
-      updateUser(fallbackUser);
-      onLoginSuccess();
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 sm:p-6 md:p-12 selection:bg-brand-navy selection:text-white" id="auth-screen">
       {/* Ambient background glows */}
@@ -128,35 +104,6 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
             Gestão Integrada de A&B / CMV
           </p>
         </div>
-
-        {/* Quick Access Accounts Selection */}
-        {!isRegister && (
-          <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 text-center" id="quick-access-panel">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2.5">
-              💡 Acesso Rápido de Teste
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickAccess('Gestor')}
-                className="px-3 py-2 bg-white border border-slate-200 hover:border-brand-navy rounded-xl text-[11px] font-bold text-brand-navy hover:bg-slate-50 transition-all flex flex-col items-center gap-1 cursor-pointer shadow-sm"
-              >
-                <Shield className="w-4 h-4 text-brand-gold" />
-                <span>Perfil Gestor</span>
-                <span className="text-[9px] text-slate-400 font-normal font-mono truncate max-w-[140px]">gerenteataide@</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickAccess('Colaborador')}
-                className="px-3 py-2 bg-white border border-slate-200 hover:border-brand-navy rounded-xl text-[11px] font-bold text-brand-navy hover:bg-slate-50 transition-all flex flex-col items-center gap-1 cursor-pointer shadow-sm"
-              >
-                <User className="w-4 h-4 text-brand-navy" />
-                <span>Perfil Colaborador</span>
-                <span className="text-[9px] text-slate-400 font-normal font-mono truncate max-w-[140px]">colaborador@</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">

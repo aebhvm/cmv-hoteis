@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StockProvider, useStock } from './context/StockContext';
 import { AuthSim } from './components/AuthSim';
 import { Dashboard } from './components/Dashboard';
@@ -40,7 +40,7 @@ function AppContent() {
   // Alertas de estoque mínimos ativos para exibir na barra de notificações
   const alertasAtivos = insumos.filter(ins => ins.estoqueAtual < ins.estoqueMinimo).length;
 
-  const tabs = [
+  const allTabs = [
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'insumos', label: 'Insumos', icon: Boxes },
     { id: 'fichas', label: 'Fichas Técnicas', icon: BookOpen },
@@ -51,13 +51,32 @@ function AppContent() {
     { id: 'usuarios', label: 'Usuários', icon: User },
   ];
 
+  const tabs = useMemo(() => {
+    if (user.cargo !== 'Colaborador') return allTabs;
+    const colaboradorTabs = ['movimentacoes', 'inventario', 'vendas'];
+    return allTabs.filter(tab => colaboradorTabs.includes(tab.id));
+  }, [user.cargo]);
+
+  useEffect(() => {
+    if (!tabs.some(tab => tab.id === activeTab)) {
+      setActiveTab(tabs[0]?.id || 'movimentacoes');
+    }
+  }, [activeTab, tabs]);
+
+  // Se nao estiver logado, exibe a tela de login/configuracao inicial
+  if (!isLoggedIn) {
+    return <AuthSim onLoginSuccess={() => setIsLoggedIn(true)} />;
+  }
+
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard onNavigate={(tab) => setActiveTab(tab)} />;
       case 'insumos':
+        if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <Insumos />;
       case 'fichas':
+        if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <FichasTecnicas />;
       case 'movimentacoes':
         return <Movimentacoes />;
@@ -66,8 +85,10 @@ function AppContent() {
       case 'vendas':
         return <Vendas />;
       case 'relatorios':
+        if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <Relatorios />;
       case 'usuarios':
+        if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <Usuarios />;
       default:
         return <Dashboard onNavigate={(tab) => setActiveTab(tab)} />;

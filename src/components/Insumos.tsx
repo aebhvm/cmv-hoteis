@@ -143,6 +143,7 @@ export const Insumos: React.FC = () => {
 
   const handleQuickAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isColaborador) return;
     if (!quickAddId || !quickQty) return;
 
     const ins = insumos.find(i => i.id === quickAddId);
@@ -397,7 +398,7 @@ export const Insumos: React.FC = () => {
       )}
 
       {/* Caixa de Entrada Rápida de Estoque (Se ativa) */}
-      {quickAddId && (
+      {quickAddId && !isColaborador && (
         <div className="bg-white border border-brand-navy/20 p-5 rounded-xl shadow-lg relative animate-scaleIn">
           <div className="flex justify-between items-center mb-3">
             <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -440,17 +441,6 @@ export const Insumos: React.FC = () => {
                 onChange={(e) => setQuickCost(e.target.value)}
                 className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                 placeholder={`Sugestão: R$ ${insumos.find(i => i.id === quickAddId)?.custoMedio.toFixed(2)}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Observação / Nota Fiscal</label>
-              <input
-                type="text"
-                value={quickObs}
-                onChange={(e) => setQuickObs(e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
-                placeholder="ex: Compra feira, NF-420"
               />
             </div>
 
@@ -532,15 +522,16 @@ export const Insumos: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Entrada Rápida */}
-                          <button
-                            onClick={() => { setQuickAddId(ins.id); setQuickQty(''); }}
-                            className="p-1.5 bg-slate-50 hover:bg-brand-navy/5 text-brand-navy rounded-lg border border-slate-200 transition-all cursor-pointer"
-                            title="Entrada Rápida de Compra"
-                          >
-                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                          </button>
-                          
+                          {/* Entrada Rapida - Somente Gestor */}
+                          {!isColaborador && (
+                            <button
+                              onClick={() => { setQuickAddId(ins.id); setQuickQty(''); }}
+                              className="p-1.5 bg-slate-50 hover:bg-brand-navy/5 text-brand-navy rounded-lg border border-slate-200 transition-all cursor-pointer"
+                              title="Entrada Rapida de Compra"
+                            >
+                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            </button>
+                          )}
                           {/* Editar - Somente Gestor */}
                           {!isColaborador && (
                             <button

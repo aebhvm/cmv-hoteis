@@ -12,7 +12,6 @@ import {
   CheckCircle, 
   AlertTriangle, 
   Building,
-  ArrowRightLeft,
   X,
   Mail,
   Eye,
@@ -20,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const Usuarios: React.FC = () => {
-  const { user, users, registerUser, deleteUser, updateUser, currentUnit } = useStock();
+  const { user, users, registerUser, deleteUser, currentUnit } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
 
   // Estados do Formulário de Cadastro
@@ -93,12 +92,6 @@ export const Usuarios: React.FC = () => {
       setSuccessMsg('Usuário removido com sucesso!');
       setTimeout(() => setSuccessMsg(''), 4000);
     }
-  };
-
-  const handleSimulateLogin = (targetUser: UserProfile) => {
-    updateUser(targetUser);
-    setSuccessMsg(`Sessão alterada! Agora você está visualizando como ${targetUser.nome} (${targetUser.cargo}).`);
-    setTimeout(() => setSuccessMsg(''), 4500);
   };
 
   return (
@@ -308,14 +301,13 @@ export const Usuarios: React.FC = () => {
                 <th className="py-3.5 px-4">Usuário / E-mail</th>
                 <th className="py-3.5 px-4">Cargo / Nível</th>
                 <th className="py-3.5 px-4 text-center">Meta CMV</th>
-                <th className="py-3.5 px-4 text-center">Simular Login</th>
                 <th className="py-3.5 px-4 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                  <td colSpan={5} className="py-8 text-center text-slate-400">
                     Nenhum usuário cadastrado para esta unidade.
                   </td>
                 </tr>
@@ -355,20 +347,6 @@ export const Usuarios: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-700">
                         {u.metaFCP}%
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => handleSimulateLogin(u)}
-                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer transition-all ${
-                            isCurrentUser
-                              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                              : 'bg-brand-navy hover:bg-brand-navy/90 text-white shadow-sm hover:scale-[1.02]'
-                          }`}
-                          disabled={isCurrentUser}
-                        >
-                          <ArrowRightLeft className="w-3.5 h-3.5 text-brand-gold" />
-                          <span>Simular Login</span>
-                        </button>
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         {!isColaborador ? (

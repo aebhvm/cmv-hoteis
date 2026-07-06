@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 
 export const Movimentacoes: React.FC = () => {
-  const { movimentacoes, insumos, addMovimentacao } = useStock();
+  const { user, movimentacoes, insumos, addMovimentacao } = useStock();
+  const isColaborador = user.cargo === 'Colaborador';
 
   // Estados para busca e filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,7 +27,7 @@ export const Movimentacoes: React.FC = () => {
   // Estados do formulário de lançamento
   const [showForm, setShowForm] = useState(false);
   const [insumoId, setInsumoId] = useState('');
-  const [tipo, setTipo] = useState<'entrada' | 'saida' | 'desperdicio' | 'ajuste'>('entrada');
+  const [tipo, setTipo] = useState<'entrada' | 'saida' | 'desperdicio' | 'ajuste'>(() => isColaborador ? 'saida' : 'entrada');
   const [quantidade, setQuantidade] = useState('');
   const [custoUnitario, setCustoUnitario] = useState('');
   const [observacao, setObservacao] = useState('');
@@ -37,6 +38,11 @@ export const Movimentacoes: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isColaborador && (tipo === 'entrada' || tipo === 'ajuste')) {
+      setErrorMsg('Colaboradores podem registrar apenas saidas e desperdicios.');
+      return;
+    }
+
     if (!insumoId || !quantidade) {
       setErrorMsg('Por favor, preencha o insumo e a quantidade.');
       return;
@@ -199,10 +205,10 @@ export const Movimentacoes: React.FC = () => {
                 }}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
               >
-                <option value="entrada">Entrada (Compra / Reposição)</option>
+                {!isColaborador && <option value="entrada">Entrada (Compra / Reposicao)</option>}
                 <option value="saida">Saída (Consumo / Brinde / Degustação)</option>
                 <option value="desperdicio">Desperdício (Perda / Erro / Preparo)</option>
-                <option value="ajuste">Ajuste de Estoque (Inventário Físico)</option>
+                {!isColaborador && <option value="ajuste">Ajuste de Estoque (Inventario Fisico)</option>}
               </select>
             </div>
 
