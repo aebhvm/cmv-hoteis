@@ -1,0 +1,6 @@
+{
+  "name": "Gestão de Estoque e Custos de Alimentos e Bebidas",
+  "description": "Sistema inteligente de controle de estoque, fichas técnicas, precificação e cálculo de CMV para restaurantes, bares e negócios de alimentação.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
