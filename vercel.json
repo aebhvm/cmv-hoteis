@@ -1,0 +1,11 @@
+{
+  "name": "cmvhoteis",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "functions": {
+    "api/state.ts": {
+      "runtime": "nodejs22.x"
+    }
+  }
+}
