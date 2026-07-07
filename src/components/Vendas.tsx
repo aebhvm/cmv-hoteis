@@ -11,15 +11,18 @@ import {
   DollarSign, 
   History, 
   Calendar,
+  Edit2,
+  Trash2,
   X
 } from 'lucide-react';
 
 export const Vendas: React.FC = () => {
-  const { fichas, registrarVenda, vendas, insumos } = useStock();
+  const { fichas, registrarVenda, updateVenda, deleteVenda, vendas, insumos } = useStock();
 
   // Estados do PDV Simulado
   const [selectedFichaId, setSelectedFichaId] = useState<string | null>(null);
   const [quantidadeVenda, setQuantidadeVenda] = useState('1');
+  const [editingVendaId, setEditingVendaId] = useState<string | null>(null);
 
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
@@ -40,16 +43,48 @@ export const Vendas: React.FC = () => {
     const f = fichas.find(fic => fic.id === selectedFichaId);
     if (!f) return;
 
-    const result = registrarVenda(selectedFichaId, qty);
+    const result = editingVendaId
+      ? updateVenda(editingVendaId, selectedFichaId, qty)
+      : registrarVenda(selectedFichaId, qty);
 
     if (result.success) {
-      setSuccessMsg(`Venda de ${qty}x ${f.nome} registrada! Estoque de ingredientes deduzido.`);
+      setSuccessMsg(editingVendaId ? 'Venda atualizada com sucesso.' : `Venda de ${qty}x ${f.nome} registrada! Estoque de ingredientes deduzido.`);
       setErrorMsg('');
       setSelectedFichaId(null);
+      setEditingVendaId(null);
       setQuantidadeVenda('1');
       setTimeout(() => setSuccessMsg(''), 4000);
     } else {
-      setErrorMsg(result.error || 'Erro desconhecido ao registrar venda.');
+      setErrorMsg(result.error || 'Erro desconhecido ao salvar venda.');
+      setSuccessMsg('');
+    }
+  };
+
+
+  const handleEditVenda = (id: string) => {
+    const venda = vendas.find(v => v.id === id);
+    if (!venda) return;
+    setEditingVendaId(id);
+    setSelectedFichaId(venda.fichaId);
+    setQuantidadeVenda(venda.quantidade.toString());
+    setErrorMsg('');
+    setSuccessMsg('');
+  };
+
+  const handleDeleteVenda = (id: string) => {
+    if (!window.confirm('Deseja excluir esta venda e devolver o consumo ao estoque?')) return;
+    const result = deleteVenda(id);
+    if (result.success) {
+      if (editingVendaId === id) {
+        setEditingVendaId(null);
+        setSelectedFichaId(null);
+        setQuantidadeVenda('1');
+      }
+      setSuccessMsg('Venda excluida e estoque restaurado.');
+      setErrorMsg('');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } else {
+      setErrorMsg(result.error || 'Erro ao excluir venda.');
       setSuccessMsg('');
     }
   };
@@ -169,7 +204,7 @@ export const Vendas: React.FC = () => {
         <div className="space-y-6">
           {/* Caixa de Checkout de Venda Ativa */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="text-[10px] font-bold text-brand-navy uppercase tracking-widest block mb-4">Registro do Pedido</span>
+            <span className="text-[10px] font-bold text-brand-navy uppercase tracking-widest block mb-4">{editingVendaId ? 'Editar Pedido' : 'Registro do Pedido'}</span>
             
             {selectedFichaId ? (
               <form onSubmit={handleVenderSubmit} className="space-y-4" id="vendas-form">
@@ -207,7 +242,7 @@ export const Vendas: React.FC = () => {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setSelectedFichaId(null)}
+                    onClick={() => { setSelectedFichaId(null); setEditingVendaId(null); setQuantidadeVenda('1'); }}
                     className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold cursor-pointer"
                   >
                     Descartar
@@ -217,7 +252,7 @@ export const Vendas: React.FC = () => {
                     className="flex-1 py-2 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-colors"
                   >
                     <ShoppingCart className="w-4 h-4 text-brand-gold" />
-                    Confirmar Venda
+                    {editingVendaId ? 'Salvar Venda' : 'Confirmar Venda'}
                   </button>
                 </div>
               </form>
@@ -269,12 +304,13 @@ export const Vendas: React.FC = () => {
                 <th className="py-3 px-4 text-right">Receita Bruta</th>
                 <th className="py-3 px-4 text-right">Custo de Matéria-Prima (CMV)</th>
                 <th className="py-3 px-4 text-right">Margem Bruta (R$)</th>
+                <th className="py-3 px-4 text-center">A??es</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
               {vendas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     Nenhuma venda processada nas últimas horas.
                   </td>
                 </tr>
@@ -292,6 +328,26 @@ export const Vendas: React.FC = () => {
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">R$ {v.receitaTotal.toFixed(2)}</td>
                       <td className="py-3 px-4 text-right font-mono text-rose-600">- R$ {v.custoInsumosTotal.toFixed(2)}</td>
                       <td className="py-3 px-4 text-right font-mono font-black text-emerald-600">R$ {margem.toFixed(2)}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditVenda(v.id)}
+                            className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 transition-all cursor-pointer"
+                            title="Editar venda"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVenda(v.id)}
+                            className="p-1.5 bg-slate-50 hover:bg-rose-50 text-rose-600 rounded-lg border border-slate-200 transition-all cursor-pointer"
+                            title="Excluir venda"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })

@@ -6,6 +6,7 @@ import {
   TrendingUp, 
   TrendingDown, 
   Trash2, 
+  Edit2,
   SlidersHorizontal, 
   FileText, 
   Calendar, 
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const Movimentacoes: React.FC = () => {
-  const { user, movimentacoes, insumos, addMovimentacao } = useStock();
+  const { user, movimentacoes, insumos, addMovimentacao, updateMovimentacao, deleteMovimentacao } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
 
   // Estados para busca e filtros
@@ -26,6 +27,7 @@ export const Movimentacoes: React.FC = () => {
 
   // Estados do formulário de lançamento
   const [showForm, setShowForm] = useState(false);
+  const [editingMovId, setEditingMovId] = useState<string | null>(null);
   const [insumoId, setInsumoId] = useState('');
   const [tipo, setTipo] = useState<'entrada' | 'saida' | 'desperdicio' | 'ajuste'>(() => isColaborador ? 'saida' : 'entrada');
   const [quantidade, setQuantidade] = useState('');
@@ -56,28 +58,87 @@ export const Movimentacoes: React.FC = () => {
 
     // Validar se quantidade é suficiente para saídas/desperdícios
     const qty = Number(quantidade);
-    if (tipo !== 'entrada' && tipo !== 'ajuste' && ins.estoqueAtual < qty) {
+    if (!editingMovId && tipo !== 'entrada' && tipo !== 'ajuste' && ins.estoqueAtual < qty) {
       setErrorMsg(`Estoque insuficiente! Estoque atual de ${ins.nome} é de ${ins.estoqueAtual} ${ins.unidadeMedida}.`);
       return;
     }
 
-    addMovimentacao({
+    const payload = {
       insumoId,
       tipo,
       quantidade: qty,
       custoUnitario: custoUnitario ? Number(custoUnitario) : undefined,
       observacao: observacao || undefined
-    });
+    };
 
-    // Resetar e dar feedback
+    const result = editingMovId ? updateMovimentacao(editingMovId, payload) : (addMovimentacao(payload), { success: true });
+    if (!result.success) {
+      setErrorMsg(result.error || 'Erro ao salvar movimentacao.');
+      setSuccessMsg('');
+      return;
+    }
+
     setInsumoId('');
     setQuantidade('');
     setCustoUnitario('');
     setObservacao('');
+    setEditingMovId(null);
     setShowForm(false);
     setErrorMsg('');
-    setSuccessMsg('Movimentação registrada com sucesso!');
+    setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+
+  const handleOpenCreate = () => {
+    setEditingMovId(null);
+    setInsumoId('');
+    setTipo(isColaborador ? 'saida' : 'entrada');
+    setQuantidade('');
+    setCustoUnitario('');
+    setObservacao('');
+    setErrorMsg('');
+    setShowForm(true);
+  };
+
+  const handleOpenEdit = (id: string) => {
+    const mov = movimentacoes.find(m => m.id === id);
+    if (!mov) return;
+    if (isColaborador && (mov.tipo === 'entrada' || mov.tipo === 'ajuste')) {
+      setErrorMsg('Colaboradores podem editar apenas saidas e desperdicios.');
+      return;
+    }
+    setEditingMovId(id);
+    setInsumoId(mov.insumoId);
+    setTipo(mov.tipo);
+    setQuantidade(mov.quantidade.toString());
+    setCustoUnitario(mov.custoUnitario?.toString() || '');
+    setObservacao(mov.observacao || '');
+    setErrorMsg('');
+    setShowForm(true);
+  };
+
+  const handleDeleteMov = (id: string) => {
+    const mov = movimentacoes.find(m => m.id === id);
+    if (!mov) return;
+    if (isColaborador && (mov.tipo === 'entrada' || mov.tipo === 'ajuste')) {
+      setErrorMsg('Colaboradores podem excluir apenas saidas e desperdicios.');
+      return;
+    }
+    if (!window.confirm('Deseja excluir esta movimentacao e reverter o estoque?')) return;
+    const result = deleteMovimentacao(id);
+    if (result.success) {
+      if (editingMovId === id) {
+        setEditingMovId(null);
+        setShowForm(false);
+      }
+      setSuccessMsg('Movimentacao excluida com sucesso.');
+      setErrorMsg('');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } else {
+      setErrorMsg(result.error || 'Erro ao excluir movimentacao.');
+      setSuccessMsg('');
+    }
   };
 
   // Filtragem
@@ -127,7 +188,7 @@ export const Movimentacoes: React.FC = () => {
           <p className="text-xs text-slate-500">Lance compras, registre quebras ou desperdícios e audite o histórico de movimentações do restaurante</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => showForm ? setShowForm(false) : handleOpenCreate()}
           className="px-4 py-2 bg-brand-navy hover:bg-brand-navy/90 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-[1.01] cursor-pointer self-start sm:self-auto"
           id="btn-lancar-mov"
         >
@@ -187,7 +248,7 @@ export const Movimentacoes: React.FC = () => {
               Lançar Novo Registro de Estoque
             </h3>
             <button 
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); setEditingMovId(null); }}
               className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -287,7 +348,7 @@ export const Movimentacoes: React.FC = () => {
             <div className="md:col-span-4 flex justify-end gap-2 pt-2 border-t border-slate-150 mt-2">
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => { setShowForm(false); setEditingMovId(null); }}
                 className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
               >
                 Cancelar
@@ -347,12 +408,13 @@ export const Movimentacoes: React.FC = () => {
                 <th className="py-3.5 px-4 text-right">Custo Unitário</th>
                 <th className="py-3.5 px-4 text-right">Custo/Impacto Total</th>
                 <th className="py-3.5 px-4">Motivo / Detalhes</th>
+                <th className="py-3.5 px-4 text-center">Acoes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
               {filteredMovs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-400">
+                  <td colSpan={8} className="py-10 text-center text-slate-400">
                     Nenhuma movimentação registrada para os filtros selecionados.
                   </td>
                 </tr>
