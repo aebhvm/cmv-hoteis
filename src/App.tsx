@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 
 function AppContent() {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem('chef_is_logged_in') === 'true');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -63,9 +63,21 @@ function AppContent() {
     }
   }, [activeTab, tabs]);
 
+  const handleLoginSuccess = () => {
+    sessionStorage.setItem('chef_is_logged_in', 'true');
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('chef_is_logged_in');
+    setIsMobileMenuOpen(false);
+    setActiveTab('dashboard');
+    setIsLoggedIn(false);
+  };
+
   // Se nao estiver logado, exibe a tela de login/configuracao inicial
   if (!isLoggedIn) {
-    return <AuthSim onLoginSuccess={() => setIsLoggedIn(true)} />;
+    return <AuthSim onLoginSuccess={handleLoginSuccess} />;
   }
 
   const renderActiveView = () => {
@@ -213,7 +225,7 @@ function AppContent() {
           <button
             onClick={() => {
               if (window.confirm('Deseja realmente sair da sessão gerencial?')) {
-                setIsLoggedIn(false);
+                handleLogout();
               }
             }}
             className="w-full flex items-center gap-2 px-3 py-2 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-xs font-semibold rounded-xl transition-all cursor-pointer"
