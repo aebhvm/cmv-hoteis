@@ -32,11 +32,6 @@ function AppContent() {
   
   const { user, insumos, currentUnit, setCurrentUnit } = useStock();
 
-  // Se não estiver logado, exibe a tela de login/configuração inicial
-  if (!isLoggedIn) {
-    return <AuthSim onLoginSuccess={() => setIsLoggedIn(true)} />;
-  }
-
   // Alertas de estoque mínimos ativos para exibir na barra de notificações
   const alertasAtivos = insumos.filter(ins => ins.estoqueAtual < ins.estoqueMinimo).length;
 
