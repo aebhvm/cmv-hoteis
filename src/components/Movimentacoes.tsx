@@ -408,7 +408,7 @@ export const Movimentacoes: React.FC = () => {
                 <th className="py-3.5 px-4 text-right">Custo Unitário</th>
                 <th className="py-3.5 px-4 text-right">Custo/Impacto Total</th>
                 <th className="py-3.5 px-4">Motivo / Detalhes</th>
-                <th className="py-3.5 px-4 text-center">Acoes</th>
+                <th className="py-3.5 px-4 text-center sticky right-0 z-10 bg-slate-50">Acoes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
@@ -459,6 +459,29 @@ export const Movimentacoes: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-slate-400 max-w-xs truncate" title={m.observacao}>
                         {m.observacao || <span className="text-slate-300 italic">Sem observações</span>}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center sticky right-0 bg-white shadow-[-8px_0_12px_rgba(15,23,42,0.04)]">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(m.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-brand-navy"
+                            title="Editar movimentacao"
+                            aria-label="Editar movimentacao"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMov(m.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-600 shadow-sm transition-all hover:bg-rose-100"
+                            title="Excluir movimentacao"
+                            aria-label="Excluir movimentacao"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
