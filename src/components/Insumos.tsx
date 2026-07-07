@@ -87,7 +87,7 @@ export const Insumos: React.FC = () => {
     e.preventDefault();
     if (isColaborador) return;
 
-    if (!nome || !custoMedio || !estoqueMinimo || (!editingId && !estoqueAtual)) {
+    if (!nome || !custoMedio || !estoqueMinimo || !estoqueAtual) {
       setErrorMsg('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
@@ -353,19 +353,20 @@ export const Insumos: React.FC = () => {
               />
             </div>
 
-            {!editingId && (
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Estoque Inicial</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={estoqueAtual}
-                  onChange={(e) => setEstoqueAtual(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
-                  placeholder="ex: 10"
-                />
-              </div>
-            )}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                {editingId ? 'Estoque Atual' : 'Estoque Inicial'} *
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={estoqueAtual}
+                onChange={(e) => setEstoqueAtual(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
+                placeholder="ex: 10"
+                required
+              />
+            </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Fornecedor Preferencial</label>
