@@ -135,6 +135,13 @@ const buildInitialCollections = () => {
   };
 };
 
+
+const mergeMissingInsumos = (saved: Insumo[], seed: Insumo[]) => {
+  const existingKeys = new Set(saved.map(i => (i.unidade || '') + '::' + i.nome.toLowerCase()));
+  const missing = seed.filter(i => !existingKeys.has((i.unidade || '') + '::' + i.nome.toLowerCase()));
+  return missing.length > 0 ? [...saved, ...missing] : saved;
+};
+
 const readJsonStorage = <T,>(key: string, fallback: T): T => {
   try {
     const saved = localStorage.getItem(key);
@@ -186,7 +193,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const initialCollections = buildInitialCollections();
 
   const [allInsumos, setAllInsumos] = useState<Insumo[]>(() =>
-    readJsonStorage<Insumo[]>('chef_all_insumos', initialCollections.allInsumos)
+    mergeMissingInsumos(readJsonStorage<Insumo[]>('chef_all_insumos', initialCollections.allInsumos), initialCollections.allInsumos)
   );
 
   const [allFichas, setAllFichas] = useState<FichaTecnica[]>(() =>
@@ -251,7 +258,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (data.currentUnit) setCurrentUnitState(data.currentUnit);
         if (data.user) setUser(data.user);
         if (Array.isArray(data.users)) setUsers(data.users);
-        if (Array.isArray(data.allInsumos)) setAllInsumos(data.allInsumos);
+        if (Array.isArray(data.allInsumos)) setAllInsumos(mergeMissingInsumos(data.allInsumos, initialCollections.allInsumos));
         if (Array.isArray(data.allFichas)) setAllFichas(data.allFichas);
         if (Array.isArray(data.allMovimentacoes)) setAllMovimentacoes(data.allMovimentacoes);
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);

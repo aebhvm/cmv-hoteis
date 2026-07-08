@@ -1,4 +1,5 @@
 import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile } from '../types';
+import { IMPORTED_INSUMOS } from './importedInsumos';
 
 export const INITIAL_USER: UserProfile = {
   nome: "Ataíde Silveira",
@@ -8,7 +9,7 @@ export const INITIAL_USER: UserProfile = {
   metaFCP: 30, // 30% meta de custo de insumos (FCP)
 };
 
-export const INITIAL_INSUMOS: Insumo[] = [
+export const INITIAL_INSUMOS: Insumo[] = [...IMPORTED_INSUMOS,
   {
     id: "ins-1",
     nome: "Filé Mignon (Limpo)",
