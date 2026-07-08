@@ -41,6 +41,8 @@ export const FichasTecnicas: React.FC = () => {
 
   // Auxiliares de inserção de ingrediente no formulário
   const [selectedInsumoId, setSelectedInsumoId] = useState('');
+  const [insumoSearchTerm, setInsumoSearchTerm] = useState('');
+  const [showInsumoSugestoes, setShowInsumoSugestoes] = useState(false);
   const [quantidadeInput, setQuantidadeInput] = useState('');
   const [unidadeInserida, setUnidadeInserida] = useState<'principal' | 'sub'>('sub'); // ex: principal = kg, sub = g
 
@@ -63,6 +65,8 @@ export const FichasTecnicas: React.FC = () => {
     setRendimentoPorcoes('1');
     setIngredientesEscolhidos([]);
     setSelectedInsumoId('');
+    setInsumoSearchTerm('');
+    setShowInsumoSugestoes(false);
     setQuantidadeInput('');
     setErrorMsg('');
   };
@@ -83,6 +87,8 @@ export const FichasTecnicas: React.FC = () => {
     setRendimentoPorcoes(f.rendimentoPorcoes.toString());
     setIngredientesEscolhidos([...f.ingredientes]);
     setSelectedInsumoId('');
+    setInsumoSearchTerm('');
+    setShowInsumoSugestoes(false);
     setQuantidadeInput('');
     setErrorMsg('');
     setShowForm(true);
@@ -119,6 +125,8 @@ export const FichasTecnicas: React.FC = () => {
 
     setIngredientesEscolhidos([...ingredientesEscolhidos, novoIng]);
     setSelectedInsumoId('');
+    setInsumoSearchTerm('');
+    setShowInsumoSugestoes(false);
     setQuantidadeInput('');
     setErrorMsg('');
   };
@@ -188,6 +196,27 @@ export const FichasTecnicas: React.FC = () => {
 
   // Preço sugerido com base na meta de FCP do usuário (ex: meta 30% -> custo / 0.3)
   const precoSugerido = activeCusto > 0 ? activeCusto / (user.metaFCP / 100) : 0;
+
+  const normalizeSearch = (value: string) =>
+    value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  const selectedInsumo = insumos.find(i => i.id === selectedInsumoId);
+  const insumoSugestoes = insumoSearchTerm.trim()
+    ? insumos
+        .filter(ins => normalizeSearch(ins.nome).includes(normalizeSearch(insumoSearchTerm)))
+        .slice(0, 8)
+    : [];
+
+  const handleSelectInsumo = (ins: Insumo) => {
+    setSelectedInsumoId(ins.id);
+    setInsumoSearchTerm(ins.nome + ' (' + ins.unidadeMedida + ') - R$ ' + ins.custoMedio.toFixed(2) + ' / ' + ins.unidadeMedida);
+    setShowInsumoSugestoes(false);
+    if (ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L') {
+      setUnidadeInserida('sub');
+    } else {
+      setUnidadeInserida('principal');
+    }
+  };
 
   return (
     <div className="space-y-6" id="fichas-tecnicas-view">
@@ -325,26 +354,46 @@ export const FichasTecnicas: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                 <div className="sm:col-span-2">
                   <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Insumo em Estoque</label>
-                  <select
-                    value={selectedInsumoId}
-                    onChange={(e) => {
-                      setSelectedInsumoId(e.target.value);
-                      const ins = insumos.find(i => i.id === e.target.value);
-                      if (ins && (ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L')) {
-                        setUnidadeInserida('sub'); // padrão para gramas ou ml
-                      } else {
-                        setUnidadeInserida('principal'); // un
-                      }
-                    }}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer font-medium"
-                  >
-                    <option value="">-- Selecione o Insumo --</option>
-                    {insumos.map(ins => (
-                      <option key={ins.id} value={ins.id}>
-                        {ins.nome} ({ins.unidadeMedida}) - R$ {ins.custoMedio.toFixed(2)} / {ins.unidadeMedida}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={insumoSearchTerm}
+                      onChange={(e) => {
+                        setInsumoSearchTerm(e.target.value);
+                        setSelectedInsumoId('');
+                        setShowInsumoSugestoes(true);
+                      }}
+                      onFocus={() => setShowInsumoSugestoes(true)}
+                      onBlur={() => window.setTimeout(() => setShowInsumoSugestoes(false), 120)}
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-medium"
+                      placeholder="Digite o nome do insumo..."
+                      autoComplete="off"
+                    />
+
+                    {showInsumoSugestoes && insumoSearchTerm.trim() && (
+                      <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl divide-y divide-slate-100">
+                        {insumoSugestoes.length > 0 ? (
+                          insumoSugestoes.map(ins => (
+                            <button
+                              key={ins.id}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectInsumo(ins)}
+                              className="w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                            >
+                              <span className="block text-xs font-bold text-slate-800">{ins.nome}</span>
+                              <span className="block text-[10px] text-slate-500 font-mono">
+                                {ins.unidadeMedida} - R$ {ins.custoMedio.toFixed(2)} / {ins.unidadeMedida}
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-3 text-xs text-slate-400">Nenhum insumo encontrado.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -362,22 +411,22 @@ export const FichasTecnicas: React.FC = () => {
                     {/* Seletor de subunidade inteligente */}
                     {selectedInsumoId && (
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        {(insumos.find(i => i.id === selectedInsumoId)?.unidadeMedida === 'kg' || 
-                          insumos.find(i => i.id === selectedInsumoId)?.unidadeMedida === 'L') && (
+                        {(selectedInsumo?.unidadeMedida === 'kg' || 
+                          selectedInsumo?.unidadeMedida === 'L') && (
                           <div className="flex bg-slate-100 border border-slate-200 rounded text-[9px] font-bold overflow-hidden shadow-sm">
                             <button
                               type="button"
                               onClick={() => setUnidadeInserida('sub')}
                               className={`px-1.5 py-0.5 cursor-pointer ${unidadeInserida === 'sub' ? 'bg-brand-navy text-white' : 'text-slate-500'}`}
                             >
-                              {insumos.find(i => i.id === selectedInsumoId)?.unidadeMedida === 'kg' ? 'g' : 'ml'}
+                              {selectedInsumo?.unidadeMedida === 'kg' ? 'g' : 'ml'}
                             </button>
                             <button
                               type="button"
                               onClick={() => setUnidadeInserida('principal')}
                               className={`px-1.5 py-0.5 cursor-pointer ${unidadeInserida === 'principal' ? 'bg-brand-navy text-white' : 'text-slate-500'}`}
                             >
-                              {insumos.find(i => i.id === selectedInsumoId)?.unidadeMedida === 'kg' ? 'kg' : 'L'}
+                              {selectedInsumo?.unidadeMedida === 'kg' ? 'kg' : 'L'}
                             </button>
                           </div>
                         )}
