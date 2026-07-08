@@ -268,17 +268,25 @@ export const Insumos: React.FC = () => {
         </div>
       </div>
 
-      {/* Formulário de Cadastro / Edição (Inline overlay-card) */}
+      {/* Modal de Cadastro / Edicao */}
       {showForm && !isColaborador && (
-        <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-lg relative animate-fadeIn" id="insumo-form">
-          <div className="flex justify-between items-center mb-4">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 py-6 sm:py-10 overflow-y-auto"
+          id="insumo-form-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="insumo-form-title"
+        >
+          <div className="w-full max-w-4xl max-h-[85vh] overflow-y-auto bg-white border border-slate-200 p-6 rounded-xl shadow-2xl relative animate-fadeIn" id="insumo-form">
+            <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Boxes className="w-4 h-4 text-brand-navy" />
-              {editingId ? 'Editar Insumo' : 'Cadastrar Novo Insumo'}
+              <span id="insumo-form-title">{editingId ? 'Editar Insumo' : 'Cadastrar Novo Insumo'}</span>
             </h3>
             <button 
               onClick={() => { setShowForm(false); resetForm(); }}
-              className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              aria-label="Fechar formulario"
             >
               <X className="w-4 h-4" />
             </button>
@@ -395,6 +403,7 @@ export const Insumos: React.FC = () => {
               </button>
             </div>
           </form>
+          </div>
         </div>
       )}
 
