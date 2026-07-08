@@ -7,6 +7,7 @@ import {
   Shield, 
   User, 
   Trash2, 
+  Edit2,
   Lock, 
   Target, 
   CheckCircle, 
@@ -19,11 +20,12 @@ import {
 } from 'lucide-react';
 
 export const Usuarios: React.FC = () => {
-  const { user, users, registerUser, deleteUser, currentUnit } = useStock();
+  const { user, users, registerUser, deleteUser, updateUser, currentUnit } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
 
   // Estados do Formulário de Cadastro
   const [showForm, setShowForm] = useState(false);
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [cargo, setCargo] = useState<'Gestor' | 'Colaborador'>('Colaborador');
@@ -38,10 +40,39 @@ export const Usuarios: React.FC = () => {
   // Filtragem dos usuários da unidade atual
   const filteredUsers = users.filter(u => u.estabelecimento === currentUnit);
 
+  const resetForm = () => {
+    setEditingEmail(null);
+    setNome('');
+    setEmail('');
+    setCargo('Colaborador');
+    setMetaFCP('30');
+    setSenha('');
+    setShowPassword(false);
+    setErrorMsg('');
+  };
+
+  const handleOpenCreate = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const handleOpenEdit = (u: UserProfile & { senha?: string }) => {
+    if (isColaborador) return;
+    setEditingEmail(u.email);
+    setNome(u.nome);
+    setEmail(u.email);
+    setCargo(u.cargo === 'Gestor' ? 'Gestor' : 'Colaborador');
+    setMetaFCP(String(u.metaFCP || 30));
+    setSenha(u.senha || '');
+    setErrorMsg('');
+    setSuccessMsg('');
+    setShowForm(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isColaborador) {
-      setErrorMsg('Apenas gestores podem cadastrar usuários.');
+      setErrorMsg('Apenas gestores podem cadastrar usuarios.');
       return;
     }
 
@@ -50,31 +81,39 @@ export const Usuarios: React.FC = () => {
       return;
     }
 
-    // Validar se e-mail já existe
-    const emailExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
+    const normalizedEmail = email.toLowerCase();
+    const originalEmail = editingEmail?.toLowerCase();
+    const emailExists = users.some(u => u.email.toLowerCase() === normalizedEmail && u.email.toLowerCase() !== originalEmail);
     if (emailExists) {
-      setErrorMsg('Este e-mail de usuário já está cadastrado.');
+      setErrorMsg('Este e-mail de usuario ja esta cadastrado.');
       return;
     }
 
-    registerUser({
+    const currentRecord = users.find(u => u.email.toLowerCase() === originalEmail);
+    const updatedUser = {
+      id: currentRecord?.id,
       nome,
       email,
       cargo,
       estabelecimento: currentUnit,
       metaFCP: Number(metaFCP),
       senha
-    });
+    };
 
-    // Resetar campos e dar sucesso
-    setNome('');
-    setEmail('');
-    setCargo('Colaborador');
-    setMetaFCP('30');
-    setSenha('');
+    if (editingEmail && originalEmail !== normalizedEmail) {
+      deleteUser(editingEmail);
+    }
+
+    registerUser(updatedUser);
+
+    if (editingEmail && originalEmail === user.email.toLowerCase()) {
+      updateUser(updatedUser);
+    }
+
+    const wasEditing = Boolean(editingEmail);
+    resetForm();
     setShowForm(false);
-    setErrorMsg('');
-    setSuccessMsg('Usuário cadastrado com sucesso!');
+    setSuccessMsg(wasEditing ? 'Usuario atualizado com sucesso!' : 'Usuario cadastrado com sucesso!');
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
@@ -109,7 +148,7 @@ export const Usuarios: React.FC = () => {
         </div>
         {!isColaborador && (
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => showForm ? setShowForm(false) : handleOpenCreate()}
             className="px-4 py-2 bg-brand-navy hover:bg-brand-navy/90 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-[1.01] cursor-pointer self-start sm:self-auto"
             id="btn-novo-usuario"
           >
@@ -143,7 +182,7 @@ export const Usuarios: React.FC = () => {
               Cadastrar Novo Usuário na Unidade {currentUnit}
             </h3>
             <button 
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); resetForm(); }}
               className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -238,7 +277,7 @@ export const Usuarios: React.FC = () => {
             <div className="flex items-end justify-end gap-2 md:col-span-1 pt-2">
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => { setShowForm(false); resetForm(); }}
                 className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
               >
                 Cancelar
@@ -350,18 +389,29 @@ export const Usuarios: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         {!isColaborador ? (
-                          <button
-                            onClick={() => handleDelete(u)}
-                            className={`p-1.5 rounded-lg border text-slate-400 transition-colors ${
-                              isCurrentUser
-                                ? 'border-slate-100 text-slate-300 cursor-not-allowed'
-                                : 'border-slate-200 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50/50 cursor-pointer'
-                            }`}
-                            disabled={isCurrentUser}
-                            title="Remover Usuário"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(u)}
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-brand-navy hover:bg-slate-50 transition-colors cursor-pointer"
+                              title="Editar usuario"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(u)}
+                              className={`p-1.5 rounded-lg border text-slate-400 transition-colors ${
+                                isCurrentUser
+                                  ? 'border-slate-100 text-slate-300 cursor-not-allowed'
+                                  : 'border-slate-200 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50/50 cursor-pointer'
+                              }`}
+                              disabled={isCurrentUser}
+                              title="Remover usuario"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-slate-300 italic text-[11px]">Restrito</span>
                         )}
