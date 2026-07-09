@@ -91,6 +91,12 @@ export const Insumos: React.FC = () => {
 
   const roundMoneyUp = (value: number) => Math.ceil((value - 1e-9) * 100) / 100;
   const getPackageUnitCost = (valor: number, conteudo: number) => conteudo > 0 ? roundMoneyUp(valor / conteudo) : 0;
+  const getEffectiveUnitCost = (ins: Insumo) => {
+    if (ins.valorEmbalagem !== undefined && ins.conteudoEmbalagem && ins.conteudoEmbalagem > 0) {
+      return getPackageUnitCost(ins.valorEmbalagem, ins.conteudoEmbalagem);
+    }
+    return roundMoneyUp(ins.custoMedio);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -409,20 +415,6 @@ export const Insumos: React.FC = () => {
               </div>
             </div>
 
-            <div className="md:col-span-3 rounded-xl border border-brand-navy/10 bg-brand-navy/5 p-3">
-              <label className="block text-[10px] font-bold text-brand-navy uppercase tracking-wider mb-1">Calculo automatico pela embalagem</label>
-              <input
-                type="number"
-                step="any"
-                value={custoMedio}
-                onChange={(e) => setCustoMedio(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-brand-navy/10 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
-                placeholder="Resultado do calculo"
-                readOnly={!!(valorEmbalagem && conteudoEmbalagem)}
-                required
-              />
-            </div>
-
             <div>
               <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
                 {editingId ? 'Estoque Atual' : 'Estoque Inicial'} *
@@ -537,7 +529,6 @@ export const Insumos: React.FC = () => {
                 <th className="py-3.5 px-4">Insumo</th>
                 <th className="py-3.5 px-4">Categoria</th>
                 <th className="py-3.5 px-4 text-right">Estoque Atual</th>
-                <th className="py-3.5 px-4 text-right">Calculo</th>
                 <th className="py-3.5 px-4 text-right">Capital Imobilizado</th>
                 <th className="py-3.5 px-4">Fornecedor</th>
                 <th className="py-3.5 px-4 text-center">Ações</th>
@@ -546,14 +537,14 @@ export const Insumos: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredInsumos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="py-10 text-center text-slate-400 font-medium">
                     Nenhum insumo encontrado com os filtros atuais.
                   </td>
                 </tr>
               ) : (
                 filteredInsumos.map(ins => {
                   const estoqueCrítico = ins.estoqueAtual < ins.estoqueMinimo;
-                  const valorEstoque = ins.estoqueAtual * ins.custoMedio;
+                  const valorEstoque = roundMoneyUp(ins.estoqueAtual * getEffectiveUnitCost(ins));
                   return (
                     <tr key={ins.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4">
@@ -579,9 +570,6 @@ export const Insumos: React.FC = () => {
                         <div className="text-[10px] text-slate-500 font-sans">
                           Mín: {ins.estoqueMinimo} {ins.unidadeMedida}
                         </div>
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-600">
-                        R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
                         R$ {valorEstoque.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

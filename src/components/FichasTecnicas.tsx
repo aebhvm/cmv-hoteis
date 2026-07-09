@@ -45,6 +45,7 @@ export const FichasTecnicas: React.FC = () => {
   const [showInsumoSugestoes, setShowInsumoSugestoes] = useState(false);
   const [quantidadeInput, setQuantidadeInput] = useState('');
   const [unidadeInserida, setUnidadeInserida] = useState<'principal' | 'sub'>('sub'); // ex: principal = kg, sub = g
+  const [editingIngredienteId, setEditingIngredienteId] = useState<string | null>(null);
 
   // Simulador de precificação individual
   const [simulacaoPrecoVenda, setSimulacaoPrecoVenda] = useState<number | null>(null);
@@ -68,6 +69,7 @@ export const FichasTecnicas: React.FC = () => {
     setInsumoSearchTerm('');
     setShowInsumoSugestoes(false);
     setQuantidadeInput('');
+    setEditingIngredienteId(null);
     setErrorMsg('');
   };
 
@@ -90,11 +92,12 @@ export const FichasTecnicas: React.FC = () => {
     setInsumoSearchTerm('');
     setShowInsumoSugestoes(false);
     setQuantidadeInput('');
+    setEditingIngredienteId(null);
     setErrorMsg('');
     setShowForm(true);
   };
 
-  // Adicionar ingrediente à lista temporária no formulário
+  // Adicionar ou atualizar ingrediente na lista temporaria no formulario
   const handleAddIngredienteAoForm = () => {
     if (!selectedInsumoId || !quantidadeInput) {
       setErrorMsg('Selecione um insumo e digite a quantidade.');
@@ -104,17 +107,14 @@ export const FichasTecnicas: React.FC = () => {
     const ins = insumos.find(i => i.id === selectedInsumoId);
     if (!ins) return;
 
-    // Converter se necessário (ex: g para kg, ml para L)
     let quantFinal = Number(quantidadeInput);
-    if (unidadeInserida === 'sub') {
-      if (ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L') {
-        quantFinal = quantFinal / 1000; // converter de g para kg / de ml para L
-      }
+    if (unidadeInserida === 'sub' && (ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L')) {
+      quantFinal = quantFinal / 1000;
     }
 
-    // Validar se o insumo já está nos ingredientes escolhidos
-    if (ingredientesEscolhidos.some(ing => ing.insumoId === selectedInsumoId)) {
-      setErrorMsg('Este insumo já foi adicionado. Remova-o antes de readicionar.');
+    const jaExiste = ingredientesEscolhidos.some(ing => ing.insumoId === selectedInsumoId);
+    if (jaExiste && editingIngredienteId !== selectedInsumoId) {
+      setErrorMsg('Este insumo ja foi adicionado. Edite a linha existente ou escolha outro insumo.');
       return;
     }
 
@@ -123,7 +123,44 @@ export const FichasTecnicas: React.FC = () => {
       quantidade: quantFinal
     };
 
-    setIngredientesEscolhidos([...ingredientesEscolhidos, novoIng]);
+    if (editingIngredienteId) {
+      setIngredientesEscolhidos(ingredientesEscolhidos.map(ing =>
+        ing.insumoId === editingIngredienteId ? novoIng : ing
+      ));
+    } else {
+      setIngredientesEscolhidos([...ingredientesEscolhidos, novoIng]);
+    }
+
+    setSelectedInsumoId('');
+    setInsumoSearchTerm('');
+    setShowInsumoSugestoes(false);
+    setQuantidadeInput('');
+    setEditingIngredienteId(null);
+    setErrorMsg('');
+  };
+
+  const handleEditarIngredienteDoForm = (ing: IngredienteFicha) => {
+    const ins = insumos.find(i => i.id === ing.insumoId);
+    if (!ins) return;
+
+    setEditingIngredienteId(ing.insumoId);
+    setSelectedInsumoId(ing.insumoId);
+    setInsumoSearchTerm(ins.nome);
+    setShowInsumoSugestoes(false);
+
+    if ((ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L') && ing.quantidade < 1) {
+      setUnidadeInserida('sub');
+      setQuantidadeInput((ing.quantidade * 1000).toString());
+    } else {
+      setUnidadeInserida('principal');
+      setQuantidadeInput(ing.quantidade.toString());
+    }
+
+    setErrorMsg('');
+  };
+
+  const handleCancelarEdicaoIngrediente = () => {
+    setEditingIngredienteId(null);
     setSelectedInsumoId('');
     setInsumoSearchTerm('');
     setShowInsumoSugestoes(false);
@@ -133,6 +170,9 @@ export const FichasTecnicas: React.FC = () => {
 
   const handleRemoverIngredienteDoForm = (insumoId: string) => {
     setIngredientesEscolhidos(ingredientesEscolhidos.filter(ing => ing.insumoId !== insumoId));
+    if (editingIngredienteId === insumoId) {
+      handleCancelarEdicaoIngrediente();
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -378,6 +418,7 @@ export const FichasTecnicas: React.FC = () => {
                       onChange={(e) => {
                         setInsumoSearchTerm(e.target.value);
                         setSelectedInsumoId('');
+                        setEditingIngredienteId(null);
                         setShowInsumoSugestoes(true);
                       }}
                       onFocus={() => setShowInsumoSugestoes(true)}
@@ -458,10 +499,22 @@ export const FichasTecnicas: React.FC = () => {
                     className="w-full py-2 bg-brand-gold hover:bg-brand-gold/90 text-white font-bold text-xs rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-sm"
                   >
                     <PlusCircle className="w-4 h-4" />
-                    Inserir Ingrediente
+                    {editingIngredienteId ? 'Atualizar Ingrediente' : 'Inserir Ingrediente'}
                   </button>
                 </div>
               </div>
+
+              {editingIngredienteId && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleCancelarEdicaoIngrediente}
+                    className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-[11px] font-bold hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancelar edicao do ingrediente
+                  </button>
+                </div>
+              )}
 
               {/* Tabela de Ingredientes Adicionados */}
               <div className="mt-3 border border-slate-200 rounded-lg overflow-hidden bg-white">
@@ -471,7 +524,7 @@ export const FichasTecnicas: React.FC = () => {
                       <th className="py-2 px-3">Insumo</th>
                       <th className="py-2 px-3 text-right">Qtd do Prato</th>
                       <th className="py-2 px-3 text-right">Custo usado</th>
-                      <th className="py-2 px-3 text-center">Remover</th>
+                      <th className="py-2 px-3 text-center">Acoes</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
@@ -494,13 +547,24 @@ export const FichasTecnicas: React.FC = () => {
                             <td className="py-2 px-3 text-right font-mono text-slate-700">{qtFriendly}</td>
                             <td className="py-2 px-3 text-right font-mono text-slate-800 font-bold">R$ {itemCusto.toFixed(2)}</td>
                             <td className="py-1 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoverIngredienteDoForm(ing.insumoId)}
-                                className="p-1 hover:bg-rose-50 rounded text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditarIngredienteDoForm(ing)}
+                                  className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-brand-navy transition-colors cursor-pointer"
+                                  title="Editar ingrediente"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoverIngredienteDoForm(ing.insumoId)}
+                                  className="p-1 hover:bg-rose-50 rounded text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                                  title="Remover ingrediente"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
