@@ -207,9 +207,35 @@ export const FichasTecnicas: React.FC = () => {
         .slice(0, 8)
     : [];
 
+  const formatQuantidade = (quantidade: number, ins: Insumo) => {
+    if (ins.unidadeMedida === 'kg' && quantidade < 1) return (quantidade * 1000).toFixed(0) + 'g';
+    if (ins.unidadeMedida === 'L' && quantidade < 1) return (quantidade * 1000).toFixed(0) + 'ml';
+    return quantidade + ' ' + ins.unidadeMedida;
+  };
+
+  const formatEmbalagem = (ins: Insumo) => {
+    const conteudo = ins.conteudoEmbalagem || 1;
+    if (ins.unidadeMedida === 'kg' && conteudo < 1) return (conteudo * 1000).toFixed(0) + 'g';
+    if (ins.unidadeMedida === 'L' && conteudo < 1) return (conteudo * 1000).toFixed(0) + 'ml';
+    return conteudo.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' ' + ins.unidadeMedida;
+  };
+
+  const getValorEmbalagem = (ins: Insumo) => ins.valorEmbalagem ?? (ins.custoMedio * (ins.conteudoEmbalagem || 1));
+
+  const getCustoPorEmbalagem = (ins: Insumo, quantidade: number) => {
+    const conteudo = ins.conteudoEmbalagem || 1;
+    const valor = getValorEmbalagem(ins);
+    return conteudo > 0 ? (valor * quantidade) / conteudo : quantidade * ins.custoMedio;
+  };
+
+  const getFormulaEmbalagem = (ins: Insumo, quantidade: number) => {
+    const valor = getValorEmbalagem(ins);
+    return 'R$ ' + valor.toFixed(2) + ' x ' + formatQuantidade(quantidade, ins) + ' / ' + formatEmbalagem(ins);
+  };
+
   const handleSelectInsumo = (ins: Insumo) => {
     setSelectedInsumoId(ins.id);
-    setInsumoSearchTerm(ins.nome + ' (' + ins.unidadeMedida + ') - R$ ' + ins.custoMedio.toFixed(2) + ' / ' + ins.unidadeMedida);
+    setInsumoSearchTerm(ins.nome + ' - embalagem R$ ' + getValorEmbalagem(ins).toFixed(2) + ' / ' + formatEmbalagem(ins));
     setShowInsumoSugestoes(false);
     if (ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L') {
       setUnidadeInserida('sub');
@@ -384,7 +410,7 @@ export const FichasTecnicas: React.FC = () => {
                             >
                               <span className="block text-xs font-bold text-slate-800">{ins.nome}</span>
                               <span className="block text-[10px] text-slate-500 font-mono">
-                                {ins.unidadeMedida} - R$ {ins.custoMedio.toFixed(2)} / {ins.unidadeMedida}
+                                Embalagem: R$ {getValorEmbalagem(ins).toFixed(2)} / {formatEmbalagem(ins)}
                               </span>
                             </button>
                           ))
@@ -454,8 +480,8 @@ export const FichasTecnicas: React.FC = () => {
                     <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
                       <th className="py-2 px-3">Insumo</th>
                       <th className="py-2 px-3 text-right">Qtd do Prato</th>
-                      <th className="py-2 px-3 text-right">Custo Unitário</th>
-                      <th className="py-2 px-3 text-right">Subtotal</th>
+                      <th className="py-2 px-3 text-right">Embalagem</th>
+                      <th className="py-2 px-3 text-right">Custo usado</th>
                       <th className="py-2 px-3 text-center">Remover</th>
                     </tr>
                   </thead>
@@ -470,20 +496,17 @@ export const FichasTecnicas: React.FC = () => {
                       ingredientesEscolhidos.map(ing => {
                         const ins = insumos.find(i => i.id === ing.insumoId);
                         if (!ins) return null;
-                        const itemCusto = ing.quantidade * ins.custoMedio;
-                        
-                        let qtFriendly = `${ing.quantidade} ${ins.unidadeMedida}`;
-                        if (ins.unidadeMedida === 'kg' && ing.quantidade < 1) {
-                          qtFriendly = `${(ing.quantidade * 1000).toFixed(0)}g`;
-                        } else if (ins.unidadeMedida === 'L' && ing.quantidade < 1) {
-                          qtFriendly = `${(ing.quantidade * 1000).toFixed(0)}ml`;
-                        }
+                        const itemCusto = getCustoPorEmbalagem(ins, ing.quantidade);
+                        const qtFriendly = formatQuantidade(ing.quantidade, ins);
 
                         return (
                           <tr key={ing.insumoId} className="hover:bg-slate-50/50">
                             <td className="py-2 px-3 text-slate-800 font-bold">{ins.nome}</td>
                             <td className="py-2 px-3 text-right font-mono text-slate-700">{qtFriendly}</td>
-                            <td className="py-2 px-3 text-right font-mono text-slate-500">R$ {ins.custoMedio.toFixed(2)} / {ins.unidadeMedida}</td>
+                            <td className="py-2 px-3 text-right font-mono text-slate-500">
+                              <div>R$ {getValorEmbalagem(ins).toFixed(2)} / {formatEmbalagem(ins)}</div>
+                              <div className="text-[10px] text-slate-400">{getFormulaEmbalagem(ins, ing.quantidade)}</div>
+                            </td>
                             <td className="py-2 px-3 text-right font-mono text-slate-800 font-bold">R$ {itemCusto.toFixed(2)}</td>
                             <td className="py-1 px-3 text-center">
                               <button
@@ -507,7 +530,7 @@ export const FichasTecnicas: React.FC = () => {
                   <span>Custo total dos ingredientes: R$ {
                     ingredientesEscolhidos.reduce((acc, ing) => {
                       const ins = insumos.find(i => i.id === ing.insumoId);
-                      return acc + (ing.quantidade * (ins?.custoMedio || 0));
+                      return ins ? acc + getCustoPorEmbalagem(ins, ing.quantidade) : acc;
                     }, 0).toFixed(2)
                   }</span>
                 </div>
@@ -771,22 +794,16 @@ export const FichasTecnicas: React.FC = () => {
                   {activeFicha.ingredientes.map(ing => {
                     const ins = insumos.find(i => i.id === ing.insumoId);
                     if (!ins) return null;
-                    const itemCusto = ing.quantidade * ins.custoMedio;
+                    const itemCusto = getCustoPorEmbalagem(ins, ing.quantidade);
                     const pesoProp = activeCusto > 0 ? (itemCusto / activeCusto) * 100 : 0;
-
-                    let qtFriendly = `${ing.quantidade} ${ins.unidadeMedida}`;
-                    if (ins.unidadeMedida === 'kg' && ing.quantidade < 1) {
-                      qtFriendly = `${(ing.quantidade * 1000).toFixed(0)}g`;
-                    } else if (ins.unidadeMedida === 'L' && ing.quantidade < 1) {
-                      qtFriendly = `${(ing.quantidade * 1000).toFixed(0)}ml`;
-                    }
+                    const qtFriendly = formatQuantidade(ing.quantidade, ins);
 
                     return (
                       <div key={ing.insumoId} className="flex justify-between items-center p-2 bg-slate-50/50 rounded-lg border border-slate-100">
                         <div>
                           <strong className="text-slate-800 block">{ins.nome}</strong>
                           <span className="text-[10px] text-slate-400">
-                            Consumo: {qtFriendly} | {pesoProp.toFixed(0)}% do custo do prato
+                            {getFormulaEmbalagem(ins, ing.quantidade)} | {pesoProp.toFixed(0)}% do custo do prato
                           </span>
                         </div>
                         <span className="font-mono font-bold text-slate-700">

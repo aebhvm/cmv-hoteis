@@ -161,6 +161,20 @@ const readJsonStorage = <T,>(key: string, fallback: T): T => {
   }
 };
 
+const getInsumoUnitCost = (insumo: Insumo) => {
+  if (insumo.valorEmbalagem !== undefined && insumo.conteudoEmbalagem && insumo.conteudoEmbalagem > 0) {
+    return Number((insumo.valorEmbalagem / insumo.conteudoEmbalagem).toFixed(4));
+  }
+  return insumo.custoMedio;
+};
+
+const getInsumoQuantityCost = (insumo: Insumo, quantidade: number) => {
+  if (insumo.valorEmbalagem !== undefined && insumo.conteudoEmbalagem && insumo.conteudoEmbalagem > 0) {
+    return (insumo.valorEmbalagem * quantidade) / insumo.conteudoEmbalagem;
+  }
+  return quantidade * insumo.custoMedio;
+};
+
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const remoteStateReadyRef = useRef(false);
 
@@ -369,7 +383,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ficha.ingredientes.forEach(ing => {
       const ins = allInsumos.find(i => i.id === ing.insumoId);
       if (ins) {
-        custoTotal += ing.quantidade * ins.custoMedio;
+        custoTotal += getInsumoQuantityCost(ins, ing.quantidade);
       }
     });
     return Number((custoTotal / (ficha.rendimentoPorcoes || 1)).toFixed(2));
@@ -563,7 +577,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const quantConsumida = (ing.quantidade / (f.rendimentoPorcoes || 1)) * qty;
       const ins = allInsumos.find(i => i.id === ing.insumoId);
       if (ins) {
-        custoTotalInsumos += quantConsumida * ins.custoMedio;
+        custoTotalInsumos += getInsumoQuantityCost(ins, quantConsumida);
 
         // Deduzir o estoque do ingrediente
         const novoEstoque = Math.max(0, ins.estoqueAtual - quantConsumida);
@@ -576,8 +590,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           insumoNome: ins.nome,
           tipo: 'saida',
           quantidade: quantConsumida,
-          custoUnitario: ins.custoMedio,
-          custoTotal: Number((quantConsumida * ins.custoMedio).toFixed(2)),
+          custoUnitario: getInsumoUnitCost(ins),
+          custoTotal: Number(getInsumoQuantityCost(ins, quantConsumida).toFixed(2)),
           data: new Date().toISOString(),
           observacao: `Consumo venda: ${qty}x ${f.nome} [venda:${saleId}]`,
           unidade: currentUnit
@@ -626,15 +640,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!ins) return;
 
       const quantConsumida = (ing.quantidade / (f.rendimentoPorcoes || 1)) * qty;
-      custoTotalInsumos += quantConsumida * ins.custoMedio;
+      custoTotalInsumos += getInsumoQuantityCost(ins, quantConsumida);
       movimentos.push({
         id: `${saleId}-${ing.insumoId}`,
         insumoId: ing.insumoId,
         insumoNome: ins.nome,
         tipo: 'saida',
         quantidade: quantConsumida,
-        custoUnitario: ins.custoMedio,
-        custoTotal: Number((quantConsumida * ins.custoMedio).toFixed(2)),
+        custoUnitario: getInsumoUnitCost(ins),
+        custoTotal: Number(getInsumoQuantityCost(ins, quantConsumida).toFixed(2)),
         data: new Date().toISOString(),
         observacao: `Consumo venda: ${qty}x ${f.nome} [venda:${saleId}]`,
         unidade: currentUnit
