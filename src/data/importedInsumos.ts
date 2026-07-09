@@ -1,6 +1,6 @@
 import { Insumo } from '../types';
 
-export const IMPORTED_INSUMOS: Insumo[] = [
+const IMPORTED_INSUMOS_BASE: Insumo[] = [
   {
     "id": "imp-001",
     "nome": "aperol",
@@ -2332,3 +2332,15 @@ export const IMPORTED_INSUMOS: Insumo[] = [
     "fornecedor": "Lista importada"
   }
 ];
+
+const CONTEUDO_EMBALAGEM_IMPORTADO = [0.75, 0.998, 1, 1, 1, 3, 1, 1, 0.395, 1, 1, 0.75, 0.06, 1, 1, 1, 1, 1, 1, 0.98, 0.75, 0.7, 1, 0.9, 1, 0.75, 0.75, 1, 0.75, 0.75, 0.7, 1, 0.72, 1, 1, 1, 1, 0.965, 1, 0.5, 0.5, 0.5, 0.5, 1, 1, 1, 0.18, 1, 1, 1.2, 1, 1, 1, 2.5, 1, 144, 5, 1, 0.4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 15, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 2.5, 0.17, 1, 1, 1, 0.2, 0.2, 1, 1, 1, 1.7, 0.9, 1, 1, 1, 1, 1, 1, 0.5, 1, 0.05, 0.72, 1.3, 2, 1, 1, 0.5, 3, 1, 1, 4.8, 1, 0.23, 1, 1, 1, 0.7, 0.7, 0.7, 0.7, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 10, 400, 0.965, 0.965, 0.7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.5, 1, 1.8, 3, 1, 0.5, 0.5, 0.5, 0.5, 1, 4.8, 1, 1, 1, 1, 1, 1, 1, 1, 0.7, 1, 1, 0.2, 0.7, 0.2, 1, 1, 0.35, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.7, 1, 1, 1, 1, 1, 1, 2, 1, 400, 0.45, 1, 1, 15, 1, 0.1, 1, 1];
+
+export const IMPORTED_INSUMOS: Insumo[] = IMPORTED_INSUMOS_BASE.map((ins, index) => {
+  const conteudoEmbalagem = CONTEUDO_EMBALAGEM_IMPORTADO[index] || 1;
+  const valorEmbalagem = Number((ins.custoMedio * conteudoEmbalagem).toFixed(4));
+  return {
+    ...ins,
+    conteudoEmbalagem,
+    valorEmbalagem
+  };
+});

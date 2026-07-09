@@ -137,9 +137,19 @@ const buildInitialCollections = () => {
 
 
 const mergeMissingInsumos = (saved: Insumo[], seed: Insumo[]) => {
-  const existingKeys = new Set(saved.map(i => (i.unidade || '') + '::' + i.nome.toLowerCase()));
+  const seedByKey = new Map(seed.map(i => [(i.unidade || '') + '::' + i.nome.toLowerCase(), i]));
+  const savedWithPackaging = saved.map(ins => {
+    const seedInsumo = seedByKey.get((ins.unidade || '') + '::' + ins.nome.toLowerCase());
+    if (!seedInsumo) return ins;
+    return {
+      ...ins,
+      conteudoEmbalagem: ins.conteudoEmbalagem ?? seedInsumo.conteudoEmbalagem,
+      valorEmbalagem: ins.valorEmbalagem ?? seedInsumo.valorEmbalagem
+    };
+  });
+  const existingKeys = new Set(savedWithPackaging.map(i => (i.unidade || '') + '::' + i.nome.toLowerCase()));
   const missing = seed.filter(i => !existingKeys.has((i.unidade || '') + '::' + i.nome.toLowerCase()));
-  return missing.length > 0 ? [...saved, ...missing] : saved;
+  return missing.length > 0 ? [...savedWithPackaging, ...missing] : savedWithPackaging;
 };
 
 const readJsonStorage = <T,>(key: string, fallback: T): T => {

@@ -33,6 +33,8 @@ export const Insumos: React.FC = () => {
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('Carnes e Peixes');
   const [unidadeMedida, setUnidadeMedida] = useState<'kg' | 'g' | 'L' | 'ml' | 'un'>('kg');
+  const [valorEmbalagem, setValorEmbalagem] = useState('');
+  const [conteudoEmbalagem, setConteudoEmbalagem] = useState('');
   const [custoMedio, setCustoMedio] = useState('');
   const [estoqueAtual, setEstoqueAtual] = useState('');
   const [estoqueMinimo, setEstoqueMinimo] = useState('');
@@ -56,6 +58,8 @@ export const Insumos: React.FC = () => {
     setNome('');
     setCategoria('Carnes e Peixes');
     setUnidadeMedida('kg');
+    setValorEmbalagem('');
+    setConteudoEmbalagem('');
     setCustoMedio('');
     setEstoqueAtual('');
     setEstoqueMinimo('');
@@ -75,6 +79,8 @@ export const Insumos: React.FC = () => {
     setNome(ins.nome);
     setCategoria(ins.categoria);
     setUnidadeMedida(ins.unidadeMedida);
+    setValorEmbalagem(ins.valorEmbalagem?.toString() || '');
+    setConteudoEmbalagem(ins.conteudoEmbalagem?.toString() || '');
     setCustoMedio(ins.custoMedio.toString());
     setEstoqueAtual(ins.estoqueAtual.toString());
     setEstoqueMinimo(ins.estoqueMinimo.toString());
@@ -87,8 +93,14 @@ export const Insumos: React.FC = () => {
     e.preventDefault();
     if (isColaborador) return;
 
-    if (!nome || !custoMedio || !estoqueMinimo || !estoqueAtual) {
-      setErrorMsg('Por favor, preencha todos os campos obrigatórios.');
+    const valorEmb = valorEmbalagem ? Number(valorEmbalagem) : undefined;
+    const conteudoEmb = conteudoEmbalagem ? Number(conteudoEmbalagem) : undefined;
+    const custoCalculado = valorEmb !== undefined && conteudoEmb && conteudoEmb > 0
+      ? Number((valorEmb / conteudoEmb).toFixed(4))
+      : Number(custoMedio);
+
+    if (!nome || !custoCalculado || !estoqueMinimo || !estoqueAtual) {
+      setErrorMsg('Por favor, preencha todos os campos obrigatorios.');
       return;
     }
 
@@ -96,7 +108,9 @@ export const Insumos: React.FC = () => {
       nome,
       categoria,
       unidadeMedida,
-      custoMedio: Number(custoMedio),
+      valorEmbalagem: valorEmb,
+      conteudoEmbalagem: conteudoEmb,
+      custoMedio: custoCalculado,
       estoqueAtual: editingId ? Number(estoqueAtual) : Number(estoqueAtual || 0),
       estoqueMinimo: Number(estoqueMinimo),
       fornecedor: fornecedor || undefined
@@ -177,6 +191,28 @@ export const Insumos: React.FC = () => {
     const matchesAlert = !filterAlerts || ins.estoqueAtual < ins.estoqueMinimo;
     return matchesSearch && matchesCategory && matchesAlert;
   });
+
+  const custoCalculadoPreview = valorEmbalagem && conteudoEmbalagem && Number(conteudoEmbalagem) > 0
+    ? Number(valorEmbalagem) / Number(conteudoEmbalagem)
+    : Number(custoMedio || 0);
+
+  const handleValorEmbalagemChange = (value: string) => {
+    setValorEmbalagem(value);
+    const valor = Number(value);
+    const conteudo = Number(conteudoEmbalagem);
+    if (value && conteudoEmbalagem && conteudo > 0) {
+      setCustoMedio((valor / conteudo).toFixed(4));
+    }
+  };
+
+  const handleConteudoEmbalagemChange = (value: string) => {
+    setConteudoEmbalagem(value);
+    const valor = Number(valorEmbalagem);
+    const conteudo = Number(value);
+    if (valorEmbalagem && value && conteudo > 0) {
+      setCustoMedio((valor / conteudo).toFixed(4));
+    }
+  };
 
   return (
     <div className="space-y-6" id="insumos-view">
@@ -349,16 +385,46 @@ export const Insumos: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Custo Unitário (R$) *</label>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Valor da Embalagem (R$)</label>
+              <input
+                type="number"
+                step="any"
+                value={valorEmbalagem}
+                onChange={(e) => handleValorEmbalagemChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
+                placeholder="ex: 53.76"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Conteudo da Embalagem *</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="any"
+                  value={conteudoEmbalagem}
+                  onChange={(e) => handleConteudoEmbalagemChange(e.target.value)}
+                  className="w-full px-3 py-2 pr-12 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
+                  placeholder="ex: 0.750"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 uppercase font-bold">{unidadeMedida}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Custo Unitario Calculado (R$) *</label>
               <input
                 type="number"
                 step="any"
                 value={custoMedio}
                 onChange={(e) => setCustoMedio(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
-                placeholder={editingId ? "Custo Médio Atual" : "Custo Inicial"}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
+                placeholder={editingId ? "Custo Medio Atual" : "Calculado automaticamente"}
                 required
               />
+              {valorEmbalagem && conteudoEmbalagem && Number(conteudoEmbalagem) > 0 && (
+                <p className="mt-1 text-[10px] text-slate-500">R$ {custoCalculadoPreview.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} por {unidadeMedida}</p>
+              )}
             </div>
 
             <div>
@@ -475,7 +541,8 @@ export const Insumos: React.FC = () => {
                 <th className="py-3.5 px-4">Insumo</th>
                 <th className="py-3.5 px-4">Categoria</th>
                 <th className="py-3.5 px-4 text-right">Estoque Atual</th>
-                <th className="py-3.5 px-4 text-right">Custo Médio</th>
+                <th className="py-3.5 px-4 text-right">Embalagem</th>
+                <th className="py-3.5 px-4 text-right">Custo Medio</th>
                 <th className="py-3.5 px-4 text-right">Capital Imobilizado</th>
                 <th className="py-3.5 px-4">Fornecedor</th>
                 <th className="py-3.5 px-4 text-center">Ações</th>
@@ -484,7 +551,7 @@ export const Insumos: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredInsumos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
+                  <td colSpan={8} className="py-10 text-center text-slate-400 font-medium">
                     Nenhum insumo encontrado com os filtros atuais.
                   </td>
                 </tr>
@@ -519,7 +586,17 @@ export const Insumos: React.FC = () => {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-600">
-                        R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {ins.conteudoEmbalagem ? (
+                          <>
+                            <div>{ins.conteudoEmbalagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {ins.unidadeMedida}</div>
+                            <div className="text-[10px] text-slate-400">R$ {(ins.valorEmbalagem || (ins.custoMedio * ins.conteudoEmbalagem)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          </>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-600">
+                        R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
                         R$ {valorEstoque.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

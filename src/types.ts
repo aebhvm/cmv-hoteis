@@ -4,6 +4,8 @@ export interface Insumo {
   categoria: string;
   unidadeMedida: 'kg' | 'g' | 'L' | 'ml' | 'un';
   custoMedio: number; // Custo médio por unidade de medida (ex: R$ por kg)
+  valorEmbalagem?: number; // Valor pago pela embalagem completa
+  conteudoEmbalagem?: number; // Quantidade contida na embalagem na unidade de medida do insumo
   estoqueAtual: number;
   estoqueMinimo: number;
   fornecedor?: string;
