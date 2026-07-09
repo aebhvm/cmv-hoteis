@@ -213,13 +213,6 @@ export const FichasTecnicas: React.FC = () => {
     return quantidade + ' ' + ins.unidadeMedida;
   };
 
-  const formatEmbalagem = (ins: Insumo) => {
-    const conteudo = ins.conteudoEmbalagem || 1;
-    if (ins.unidadeMedida === 'kg' && conteudo < 1) return (conteudo * 1000).toFixed(0) + 'g';
-    if (ins.unidadeMedida === 'L' && conteudo < 1) return (conteudo * 1000).toFixed(0) + 'ml';
-    return conteudo.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' ' + ins.unidadeMedida;
-  };
-
   const roundMoneyUp = (value: number) => Math.ceil((value - 1e-9) * 100) / 100;
 
   const getValorEmbalagem = (ins: Insumo) => ins.valorEmbalagem ?? (ins.custoMedio * (ins.conteudoEmbalagem || 1));
@@ -230,14 +223,9 @@ export const FichasTecnicas: React.FC = () => {
     return roundMoneyUp(conteudo > 0 ? (valor * quantidade) / conteudo : quantidade * ins.custoMedio);
   };
 
-  const getFormulaEmbalagem = (ins: Insumo, quantidade: number) => {
-    const valor = getValorEmbalagem(ins);
-    return 'R$ ' + valor.toFixed(2) + ' x ' + formatQuantidade(quantidade, ins) + ' / ' + formatEmbalagem(ins);
-  };
-
   const handleSelectInsumo = (ins: Insumo) => {
     setSelectedInsumoId(ins.id);
-    setInsumoSearchTerm(ins.nome + ' - embalagem R$ ' + getValorEmbalagem(ins).toFixed(2) + ' / ' + formatEmbalagem(ins));
+    setInsumoSearchTerm(ins.nome);
     setShowInsumoSugestoes(false);
     if (ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L') {
       setUnidadeInserida('sub');
@@ -412,7 +400,7 @@ export const FichasTecnicas: React.FC = () => {
                             >
                               <span className="block text-xs font-bold text-slate-800">{ins.nome}</span>
                               <span className="block text-[10px] text-slate-500 font-mono">
-                                Embalagem: R$ {getValorEmbalagem(ins).toFixed(2)} / {formatEmbalagem(ins)}
+                                R$ {getCustoPorEmbalagem(ins, 1).toFixed(2)}
                               </span>
                             </button>
                           ))
@@ -482,7 +470,6 @@ export const FichasTecnicas: React.FC = () => {
                     <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
                       <th className="py-2 px-3">Insumo</th>
                       <th className="py-2 px-3 text-right">Qtd do Prato</th>
-                      <th className="py-2 px-3 text-right">Embalagem</th>
                       <th className="py-2 px-3 text-right">Custo usado</th>
                       <th className="py-2 px-3 text-center">Remover</th>
                     </tr>
@@ -490,7 +477,7 @@ export const FichasTecnicas: React.FC = () => {
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {ingredientesEscolhidos.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-6 text-center text-slate-400 font-normal">
+                        <td colSpan={4} className="py-6 text-center text-slate-400 font-normal">
                           Adicione ingredientes acima para compor o custo da receita.
                         </td>
                       </tr>
@@ -505,10 +492,6 @@ export const FichasTecnicas: React.FC = () => {
                           <tr key={ing.insumoId} className="hover:bg-slate-50/50">
                             <td className="py-2 px-3 text-slate-800 font-bold">{ins.nome}</td>
                             <td className="py-2 px-3 text-right font-mono text-slate-700">{qtFriendly}</td>
-                            <td className="py-2 px-3 text-right font-mono text-slate-500">
-                              <div>R$ {getValorEmbalagem(ins).toFixed(2)} / {formatEmbalagem(ins)}</div>
-                              <div className="text-[10px] text-slate-400">{getFormulaEmbalagem(ins, ing.quantidade)}</div>
-                            </td>
                             <td className="py-2 px-3 text-right font-mono text-slate-800 font-bold">R$ {itemCusto.toFixed(2)}</td>
                             <td className="py-1 px-3 text-center">
                               <button
@@ -805,7 +788,7 @@ export const FichasTecnicas: React.FC = () => {
                         <div>
                           <strong className="text-slate-800 block">{ins.nome}</strong>
                           <span className="text-[10px] text-slate-400">
-                            {getFormulaEmbalagem(ins, ing.quantidade)} | {pesoProp.toFixed(0)}% do custo do prato
+                            Consumo: {qtFriendly} | {pesoProp.toFixed(0)}% do custo do prato
                           </span>
                         </div>
                         <span className="font-mono font-bold text-slate-700">
