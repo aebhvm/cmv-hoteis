@@ -145,6 +145,16 @@ const readJsonStorage = <T,>(key: string, fallback: T): T => {
   }
 };
 
+const dedupeInsumosById = (items: Insumo[]) => {
+  const seen = new Set<string>();
+  return items.filter(ins => {
+    if (!ins.id) return true;
+    if (seen.has(ins.id)) return false;
+    seen.add(ins.id);
+    return true;
+  });
+};
+
 const roundMoneyUp = (value: number) => Math.ceil((value - 1e-9) * 100) / 100;
 
 const getInsumoUnitCost = (insumo: Insumo) => {
@@ -203,7 +213,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const initialCollections = buildInitialCollections();
 
   const [allInsumos, setAllInsumos] = useState<Insumo[]>(() =>
-    readJsonStorage<Insumo[]>('chef_all_insumos', initialCollections.allInsumos)
+    dedupeInsumosById(readJsonStorage<Insumo[]>('chef_all_insumos', initialCollections.allInsumos))
   );
 
   const [allFichas, setAllFichas] = useState<FichaTecnica[]>(() =>
@@ -229,7 +239,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('chef_all_insumos', JSON.stringify(allInsumos));
+    localStorage.setItem('chef_all_insumos', JSON.stringify(dedupeInsumosById(allInsumos)));
   }, [allInsumos]);
 
   useEffect(() => {
@@ -249,7 +259,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     currentUnit,
     user,
     users,
-    allInsumos,
+    allInsumos: dedupeInsumosById(allInsumos),
     allFichas,
     allMovimentacoes,
     allVendas
@@ -268,7 +278,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (data.currentUnit) setCurrentUnitState(data.currentUnit);
         if (data.user) setUser(data.user);
         if (Array.isArray(data.users)) setUsers(data.users);
-        if (Array.isArray(data.allInsumos)) setAllInsumos(data.allInsumos);
+        if (Array.isArray(data.allInsumos)) setAllInsumos(dedupeInsumosById(data.allInsumos));
         if (Array.isArray(data.allFichas)) setAllFichas(data.allFichas);
         if (Array.isArray(data.allMovimentacoes)) setAllMovimentacoes(data.allMovimentacoes);
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
@@ -746,9 +756,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (Array.isArray(data.users)) setUsers(data.users);
 
       if (Array.isArray(data.allInsumos)) {
-        setAllInsumos(data.allInsumos);
+        setAllInsumos(dedupeInsumosById(data.allInsumos));
       } else if (Array.isArray(data.insumos)) {
-        setAllInsumos(prev => [...prev.filter(i => i.unidade !== currentUnit), ...data.insumos.map((i: Insumo) => ({ ...i, unidade: currentUnit }))]);
+        setAllInsumos(prev => dedupeInsumosById([...prev.filter(i => i.unidade !== currentUnit), ...data.insumos.map((i: Insumo) => ({ ...i, unidade: currentUnit }))]));
       }
 
       if (Array.isArray(data.allFichas)) {
