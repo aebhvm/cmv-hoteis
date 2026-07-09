@@ -55,6 +55,25 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
   `;
 };
 
+const dedupeInsumosById = (items: any[]) => {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    if (!item?.id) return true;
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+};
+
+const normalizeState = (state: any) => {
+  if (!state || typeof state !== 'object') return state;
+  if (!Array.isArray(state.allInsumos)) return state;
+  return {
+    ...state,
+    allInsumos: dedupeInsumosById(state.allInsumos),
+  };
+};
+
 export default async function handler(req: any, res: any) {
   try {
     const sql = getSql();
@@ -63,7 +82,15 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'GET') {
       const rows = await sql`SELECT data FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
       if (rows.length > 0) {
-        return res.status(200).json(rows[0].data);
+        const normalized = normalizeState(rows[0].data);
+        if (JSON.stringify(normalized.allInsumos || []) !== JSON.stringify(rows[0].data.allInsumos || [])) {
+          await sql`
+            UPDATE app_state
+            SET data = ${JSON.stringify(normalized)}::jsonb, updated_at = now()
+            WHERE id = ${APP_STATE_ID}
+          `;
+        }
+        return res.status(200).json(normalized);
       }
 
       await sql`
@@ -79,9 +106,11 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: 'Invalid payload.' });
       }
 
+      const normalized = normalizeState(body);
+
       await sql`
         INSERT INTO app_state (id, data, updated_at)
-        VALUES (${APP_STATE_ID}, ${JSON.stringify(body)}::jsonb, now())
+        VALUES (${APP_STATE_ID}, ${JSON.stringify(normalized)}::jsonb, now())
         ON CONFLICT (id)
         DO UPDATE SET data = excluded.data, updated_at = now()
       `;
