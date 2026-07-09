@@ -220,12 +220,14 @@ export const FichasTecnicas: React.FC = () => {
     return conteudo.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' ' + ins.unidadeMedida;
   };
 
+  const roundMoneyUp = (value: number) => Math.ceil((value - 1e-9) * 100) / 100;
+
   const getValorEmbalagem = (ins: Insumo) => ins.valorEmbalagem ?? (ins.custoMedio * (ins.conteudoEmbalagem || 1));
 
   const getCustoPorEmbalagem = (ins: Insumo, quantidade: number) => {
     const conteudo = ins.conteudoEmbalagem || 1;
     const valor = getValorEmbalagem(ins);
-    return conteudo > 0 ? (valor * quantidade) / conteudo : quantidade * ins.custoMedio;
+    return roundMoneyUp(conteudo > 0 ? (valor * quantidade) / conteudo : quantidade * ins.custoMedio);
   };
 
   const getFormulaEmbalagem = (ins: Insumo, quantidade: number) => {

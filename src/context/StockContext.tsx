@@ -161,16 +161,18 @@ const readJsonStorage = <T,>(key: string, fallback: T): T => {
   }
 };
 
+const roundMoneyUp = (value: number) => Math.ceil((value - 1e-9) * 100) / 100;
+
 const getInsumoUnitCost = (insumo: Insumo) => {
   if (insumo.valorEmbalagem !== undefined && insumo.conteudoEmbalagem && insumo.conteudoEmbalagem > 0) {
-    return Number((insumo.valorEmbalagem / insumo.conteudoEmbalagem).toFixed(4));
+    return roundMoneyUp(insumo.valorEmbalagem / insumo.conteudoEmbalagem);
   }
   return insumo.custoMedio;
 };
 
 const getInsumoQuantityCost = (insumo: Insumo, quantidade: number) => {
   if (insumo.valorEmbalagem !== undefined && insumo.conteudoEmbalagem && insumo.conteudoEmbalagem > 0) {
-    return (insumo.valorEmbalagem * quantidade) / insumo.conteudoEmbalagem;
+    return roundMoneyUp((insumo.valorEmbalagem * quantidade) / insumo.conteudoEmbalagem);
   }
   return quantidade * insumo.custoMedio;
 };
