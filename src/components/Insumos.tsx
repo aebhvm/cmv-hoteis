@@ -95,14 +95,13 @@ export const Insumos: React.FC = () => {
 
     const valorEmb = valorEmbalagem ? Number(valorEmbalagem) : undefined;
     const conteudoEmb = conteudoEmbalagem ? Number(conteudoEmbalagem) : undefined;
-    const custoCalculado = valorEmb !== undefined && conteudoEmb && conteudoEmb > 0
-      ? Number((valorEmb / conteudoEmb).toFixed(4))
-      : Number(custoMedio);
 
-    if (!nome || !custoCalculado || !estoqueMinimo || !estoqueAtual) {
-      setErrorMsg('Por favor, preencha todos os campos obrigatorios.');
+    if (!nome || !valorEmb || !conteudoEmb || conteudoEmb <= 0 || !estoqueMinimo || !estoqueAtual) {
+      setErrorMsg('Preencha nome, valor da embalagem, quantidade da embalagem, estoque minimo e estoque atual.');
       return;
     }
+
+    const custoCalculado = Number(getPackageUnitCost(valorEmb, conteudoEmb).toFixed(4));
 
     const insumoData = {
       nome,
@@ -192,9 +191,22 @@ export const Insumos: React.FC = () => {
     return matchesSearch && matchesCategory && matchesAlert;
   });
 
+  const formatPackageQuantity = (quantity: number, unit: Insumo['unidadeMedida']) => {
+    if (unit === 'kg' && quantity < 1) return (quantity * 1000).toFixed(0) + 'g';
+    if (unit === 'L' && quantity < 1) return (quantity * 1000).toFixed(0) + 'ml';
+    return quantity.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' ' + unit;
+  };
+
+  const getPackageValue = (ins: Insumo) => ins.valorEmbalagem ?? (ins.custoMedio * (ins.conteudoEmbalagem || 1));
+  const getPackageUnitCost = (valor: number, conteudo: number) => conteudo > 0 ? valor / conteudo : 0;
+
   const custoCalculadoPreview = valorEmbalagem && conteudoEmbalagem && Number(conteudoEmbalagem) > 0
-    ? Number(valorEmbalagem) / Number(conteudoEmbalagem)
+    ? getPackageUnitCost(Number(valorEmbalagem), Number(conteudoEmbalagem))
     : Number(custoMedio || 0);
+
+  const formulaEmbalagemPreview = valorEmbalagem && conteudoEmbalagem && Number(conteudoEmbalagem) > 0
+    ? 'R$ ' + Number(valorEmbalagem).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' / ' + formatPackageQuantity(Number(conteudoEmbalagem), unidadeMedida)
+    : '';
 
   const handleValorEmbalagemChange = (value: string) => {
     setValorEmbalagem(value);
@@ -228,7 +240,7 @@ export const Insumos: React.FC = () => {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500">Gerencie ingredientes, custos médios ponderados e alertas de estoque de segurança</p>
+          <p className="text-xs text-slate-500">Cadastre o valor e a quantidade da embalagem para calcular automaticamente o custo usado nas fichas.</p>
         </div>
         
         {!isColaborador ? (
@@ -385,7 +397,7 @@ export const Insumos: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Valor da Embalagem (R$)</label>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Valor da Embalagem (R$) *</label>
               <input
                 type="number"
                 step="any"
@@ -405,25 +417,29 @@ export const Insumos: React.FC = () => {
                   value={conteudoEmbalagem}
                   onChange={(e) => handleConteudoEmbalagemChange(e.target.value)}
                   className="w-full px-3 py-2 pr-12 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
-                  placeholder="ex: 0.750"
+                  placeholder={unidadeMedida === 'L' ? 'ex: 0.750' : unidadeMedida === 'kg' ? 'ex: 1.000' : 'ex: 1'}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 uppercase font-bold">{unidadeMedida}</span>
               </div>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Custo Unitario Calculado (R$) *</label>
+            <div className="md:col-span-3 rounded-xl border border-brand-navy/10 bg-brand-navy/5 p-3">
+              <label className="block text-[10px] font-bold text-brand-navy uppercase tracking-wider mb-1">Calculo automatico pela embalagem</label>
               <input
                 type="number"
                 step="any"
                 value={custoMedio}
                 onChange={(e) => setCustoMedio(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
-                placeholder={editingId ? "Custo Medio Atual" : "Calculado automaticamente"}
+                className="w-full px-3 py-2 bg-white border border-brand-navy/10 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
+                placeholder="Resultado do calculo"
+                readOnly={!!(valorEmbalagem && conteudoEmbalagem)}
                 required
               />
-              {valorEmbalagem && conteudoEmbalagem && Number(conteudoEmbalagem) > 0 && (
-                <p className="mt-1 text-[10px] text-slate-500">R$ {custoCalculadoPreview.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} por {unidadeMedida}</p>
+              {formulaEmbalagemPreview && (
+                <p className="mt-2 text-[11px] text-slate-600">
+                  <span className="font-bold text-brand-navy">{formulaEmbalagemPreview}</span>
+                  <span> = R$ {custoCalculadoPreview.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} por {unidadeMedida}</span>
+                </p>
               )}
             </div>
 
@@ -542,7 +558,7 @@ export const Insumos: React.FC = () => {
                 <th className="py-3.5 px-4">Categoria</th>
                 <th className="py-3.5 px-4 text-right">Estoque Atual</th>
                 <th className="py-3.5 px-4 text-right">Embalagem</th>
-                <th className="py-3.5 px-4 text-right">Custo Medio</th>
+                <th className="py-3.5 px-4 text-right">Calculo</th>
                 <th className="py-3.5 px-4 text-right">Capital Imobilizado</th>
                 <th className="py-3.5 px-4">Fornecedor</th>
                 <th className="py-3.5 px-4 text-center">Ações</th>
@@ -588,15 +604,22 @@ export const Insumos: React.FC = () => {
                       <td className="py-3 px-4 text-right font-mono text-slate-600">
                         {ins.conteudoEmbalagem ? (
                           <>
-                            <div>{ins.conteudoEmbalagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {ins.unidadeMedida}</div>
-                            <div className="text-[10px] text-slate-400">R$ {(ins.valorEmbalagem || (ins.custoMedio * ins.conteudoEmbalagem)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div>{formatPackageQuantity(ins.conteudoEmbalagem, ins.unidadeMedida)}</div>
+                            <div className="text-[10px] text-slate-400">R$ {getPackageValue(ins).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           </>
                         ) : (
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-600">
-                        R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                        {ins.conteudoEmbalagem ? (
+                          <>
+                            <div className="text-[10px] text-slate-400">R$ {getPackageValue(ins).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {formatPackageQuantity(ins.conteudoEmbalagem, ins.unidadeMedida)}</div>
+                            <div>R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</div>
+                          </>
+                        ) : (
+                          <>R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
                         R$ {valorEstoque.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
