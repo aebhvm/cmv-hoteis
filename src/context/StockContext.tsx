@@ -26,6 +26,7 @@ interface StockContextType {
     quantidade: number;
     custoUnitario?: number;
     observacao?: string;
+    data?: string;
   }) => void;
   updateMovimentacao: (id: string, mov: {
     insumoId: string;
@@ -33,6 +34,7 @@ interface StockContextType {
     quantidade: number;
     custoUnitario?: number;
     observacao?: string;
+    data?: string;
   }) => { success: boolean; error?: string };
   deleteMovimentacao: (id: string) => { success: boolean; error?: string };
   addFicha: (ficha: Omit<FichaTecnica, 'id'>) => void;
@@ -392,6 +394,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     quantidade: number;
     custoUnitario?: number;
     observacao?: string;
+    data?: string;
   }) => {
     const insumo = allInsumos.find(i => i.id === movData.insumoId);
     if (!insumo) return;
@@ -438,7 +441,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       quantidade: qty,
       custoUnitario: costUnit,
       custoTotal: totalCost,
-      data: new Date().toISOString(),
+      data: movData.data || new Date().toISOString(),
       observacao: movData.observacao || '',
       unidade: currentUnit
     };
@@ -458,6 +461,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     quantidade: number;
     custoUnitario?: number;
     observacao?: string;
+    data?: string;
   }) => {
     const original = allMovimentacoes.find(m => m.id === id);
     const insumoNovo = allInsumos.find(i => i.id === movData.insumoId);
@@ -473,6 +477,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       quantidade: qty,
       custoUnitario: costUnit,
       custoTotal: Number((qty * costUnit).toFixed(2)),
+      data: movData.data || original.data,
       observacao: movData.observacao || ''
     };
 

@@ -22,15 +22,23 @@ import {
   Bell, 
   Menu, 
   X,
-  Target
+  Target,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem('chef_is_logged_in') === 'true');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('chef_dark_mode') === 'true');
   
   const { user, insumos, currentUnit, setCurrentUnit } = useStock();
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+    localStorage.setItem('chef_dark_mode', String(isDarkMode));
+  }, [isDarkMode]);
 
   // Alertas de estoque mínimos ativos para exibir na barra de notificações
   const alertasAtivos = insumos.filter(ins => ins.estoqueAtual < ins.estoqueMinimo).length;
@@ -243,6 +251,19 @@ function AppContent() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setIsDarkMode(current => !current)}
+              className="p-2 hover:bg-slate-50 rounded-xl text-slate-500 hover:text-slate-800 transition-colors"
+              title={isDarkMode ? 'Usar tela clara' : 'Usar tela escura'}
+              aria-label={isDarkMode ? 'Usar tela clara' : 'Usar tela escura'}
+              aria-pressed={isDarkMode}
+            >
+              {isDarkMode
+                ? <Sun className="w-4 h-4" />
+                : <Moon className="w-4 h-4" />}
+            </button>
+
             {/* Notificações rápidas de estoque */}
             <div className="relative group">
               <button className="p-2 hover:bg-slate-50 rounded-xl text-slate-500 hover:text-slate-800 transition-colors relative">

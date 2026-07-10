@@ -17,6 +17,21 @@ import {
   X
 } from 'lucide-react';
 
+const toLocalDateKey = (value: string | Date) => {
+  const date = value instanceof Date ? value : new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toMovementIso = (dateKey: string, previousDate?: string) => {
+  const base = previousDate ? new Date(previousDate) : new Date();
+  const [year, month, day] = dateKey.split('-').map(Number);
+  base.setFullYear(year, month - 1, day);
+  return base.toISOString();
+};
+
 export const Movimentacoes: React.FC = () => {
   const { user, movimentacoes, insumos, addMovimentacao, updateMovimentacao, deleteMovimentacao } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
@@ -24,6 +39,7 @@ export const Movimentacoes: React.FC = () => {
   // Estados para busca e filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'todos' | 'entrada' | 'saida' | 'desperdicio' | 'ajuste'>('todos');
+  const [selectedDate, setSelectedDate] = useState('');
 
   // Estados do formulário de lançamento
   const [showForm, setShowForm] = useState(false);
@@ -33,6 +49,7 @@ export const Movimentacoes: React.FC = () => {
   const [quantidade, setQuantidade] = useState('');
   const [custoUnitario, setCustoUnitario] = useState('');
   const [observacao, setObservacao] = useState('');
+  const [dataMovimentacao, setDataMovimentacao] = useState(() => toLocalDateKey(new Date()));
 
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
@@ -63,12 +80,14 @@ export const Movimentacoes: React.FC = () => {
       return;
     }
 
+    const originalMov = editingMovId ? movimentacoes.find(m => m.id === editingMovId) : undefined;
     const payload = {
       insumoId,
       tipo,
       quantidade: qty,
       custoUnitario: custoUnitario ? Number(custoUnitario) : undefined,
-      observacao: observacao || undefined
+      observacao: observacao || undefined,
+      data: toMovementIso(dataMovimentacao, originalMov?.data)
     };
 
     const result = editingMovId ? updateMovimentacao(editingMovId, payload) : (addMovimentacao(payload), { success: true });
@@ -85,6 +104,7 @@ export const Movimentacoes: React.FC = () => {
     setEditingMovId(null);
     setShowForm(false);
     setErrorMsg('');
+    setDataMovimentacao(toLocalDateKey(new Date()));
     setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');
     setTimeout(() => setSuccessMsg(''), 3000);
   };
@@ -98,6 +118,7 @@ export const Movimentacoes: React.FC = () => {
     setCustoUnitario('');
     setObservacao('');
     setErrorMsg('');
+    setDataMovimentacao(toLocalDateKey(new Date()));
     setShowForm(true);
   };
 
@@ -115,6 +136,7 @@ export const Movimentacoes: React.FC = () => {
     setCustoUnitario(mov.custoUnitario?.toString() || '');
     setObservacao(mov.observacao || '');
     setErrorMsg('');
+    setDataMovimentacao(toLocalDateKey(mov.data));
     setShowForm(true);
   };
 
@@ -146,17 +168,29 @@ export const Movimentacoes: React.FC = () => {
     const matchesSearch = m.insumoNome.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (m.observacao && m.observacao.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = selectedType === 'todos' || m.tipo === selectedType;
-    return matchesSearch && matchesType;
-  });
+    const matchesDate = !selectedDate || toLocalDateKey(m.data) === selectedDate;
+    return matchesSearch && matchesType && matchesDate;
+  }).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-  // Somatórias baseadas nos filtros/histórico
-  const totalEntradasR$ = movimentacoes
+  const groupedMovs = filteredMovs.reduce<Array<{ dateKey: string; items: typeof filteredMovs }>>((groups, mov) => {
+    const dateKey = toLocalDateKey(mov.data);
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup?.dateKey === dateKey) lastGroup.items.push(mov);
+    else groups.push({ dateKey, items: [mov] });
+    return groups;
+  }, []);
+
+  const movimentosDaData = movimentacoes.filter(m => !selectedDate || toLocalDateKey(m.data) === selectedDate);
+  const totalEntradasR$ = movimentosDaData
     .filter(m => m.tipo === 'entrada')
     .reduce((acc, m) => acc + m.custoTotal, 0);
 
-  const totalDesperdicioR$ = movimentacoes
+  const totalDesperdicioR$ = movimentosDaData
     .filter(m => m.tipo === 'desperdicio')
     .reduce((acc, m) => acc + m.custoTotal, 0);
+  const selectedDateLabel = selectedDate
+    ? new Date(`${selectedDate}T12:00:00`).toLocaleDateString('pt-BR')
+    : 'Todo o período';
 
   const getTipoEstilo = (tipo: string) => {
     switch(tipo) {
@@ -216,7 +250,7 @@ export const Movimentacoes: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
           <div>
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Total de Entradas (Compras)</span>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Entradas - {selectedDateLabel}</span>
             <span className="text-xl font-black text-slate-800 font-mono mt-1">
               R$ {totalEntradasR$.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
@@ -228,7 +262,7 @@ export const Movimentacoes: React.FC = () => {
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
           <div>
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Prejuízo por Desperdício Registrado</span>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Desperdício - {selectedDateLabel}</span>
             <span className="text-xl font-black text-rose-600 font-mono mt-1">
               R$ {totalDesperdicioR$.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
@@ -255,7 +289,7 @@ export const Movimentacoes: React.FC = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tipo de Lançamento *</label>
               <select
@@ -271,6 +305,18 @@ export const Movimentacoes: React.FC = () => {
                 <option value="desperdicio">Desperdício (Perda / Erro / Preparo)</option>
                 {!isColaborador && <option value="ajuste">Ajuste de Estoque (Inventario Fisico)</option>}
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="data-movimentacao" className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Data da Movimentação *</label>
+              <input
+                id="data-movimentacao"
+                type="date"
+                value={dataMovimentacao}
+                onChange={(e) => setDataMovimentacao(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
+                required
+              />
             </div>
 
             <div>
@@ -345,7 +391,7 @@ export const Movimentacoes: React.FC = () => {
               />
             </div>
 
-            <div className="md:col-span-4 flex justify-end gap-2 pt-2 border-t border-slate-150 mt-2">
+            <div className="md:col-span-5 flex justify-end gap-2 pt-2 border-t border-slate-150 mt-2">
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditingMovId(null); }}
@@ -367,8 +413,9 @@ export const Movimentacoes: React.FC = () => {
       {/* Tabela do Histórico */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" id="movimentacoes-table-box">
         {/* Filtros da Tabela */}
-        <div className="bg-slate-50/50 p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 justify-between items-center">
-          <div className="w-full sm:w-72 relative">
+        <div className="bg-slate-50/50 p-4 border-b border-slate-200 flex flex-col lg:flex-row gap-3 justify-between lg:items-center">
+          <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+            <div className="w-full sm:w-72 relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -377,6 +424,30 @@ export const Movimentacoes: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
             />
+          </div>
+            <div className="flex gap-1.5">
+              <div className="relative flex-1 sm:w-44">
+                <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  aria-label="Filtrar movimentações por data"
+                  className="w-full pl-9 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
+                />
+              </div>
+              {selectedDate && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate('')}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  title="Mostrar todas as datas"
+                  aria-label="Limpar filtro de data"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-1 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
@@ -419,7 +490,18 @@ export const Movimentacoes: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredMovs.map(m => {
+                groupedMovs.map(group => (
+                  <React.Fragment key={group.dateKey}>
+                    <tr className="bg-slate-50/80 border-y border-slate-200">
+                      <td colSpan={8} className="px-4 py-2">
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                          <Calendar className="w-3.5 h-3.5 text-brand-navy" />
+                          {new Date(`${group.dateKey}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                          <span className="text-slate-400">({group.items.length})</span>
+                        </div>
+                      </td>
+                    </tr>
+                    {group.items.map(m => {
                   const dataObj = new Date(m.data);
                   const dataFormatada = dataObj.toLocaleDateString('pt-BR');
                   const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -485,7 +567,9 @@ export const Movimentacoes: React.FC = () => {
                       </td>
                     </tr>
                   );
-                })
+                    })}
+                  </React.Fragment>
+                ))
               )}
             </tbody>
           </table>
