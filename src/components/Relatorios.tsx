@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
+import readExcelFile from 'read-excel-file/browser';
+import writeExcelFile from 'write-excel-file/browser';
 import { 
   BarChart4, 
   Download, 
@@ -16,6 +18,114 @@ import {
   Lock
 } from 'lucide-react';
 
+type SpreadsheetRow = Record<string, unknown>;
+type SpreadsheetCell = string | number | boolean | Date | null;
+
+const INSUMO_HEADERS = ['id', 'nome', 'categoria', 'unidadeMedida', 'custoMedio', 'valorEmbalagem', 'conteudoEmbalagem', 'estoqueAtual', 'estoqueMinimo', 'fornecedor', 'unidade'];
+const FICHA_HEADERS = ['id', 'nome', 'categoria', 'precoVenda', 'rendimentoPorcoes', 'descricao', 'unidade'];
+const INGREDIENTE_HEADERS = ['fichaId', 'insumoId', 'quantidade'];
+const MOVIMENTACAO_HEADERS = ['id', 'insumoId', 'insumoNome', 'tipo', 'quantidade', 'custoUnitario', 'custoTotal', 'data', 'observacao', 'unidade'];
+const VENDA_HEADERS = ['id', 'fichaId', 'fichaNome', 'quantidade', 'precoVendaUnitario', 'receitaTotal', 'custoInsumosTotal', 'data', 'unidade'];
+const USUARIO_HEADERS = ['id', 'nome', 'email', 'cargo', 'estabelecimento', 'metaFCP', 'senha'];
+
+const toNumber = (value: unknown, fallback = 0) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+};
+
+const toOptionalNumber = (value: unknown) => value === null || value === undefined || value === '' ? undefined : toNumber(value);
+const toString = (value: unknown) => value === null || value === undefined ? '' : String(value);
+
+const toCellValue = (value: unknown): SpreadsheetCell => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value instanceof Date) return value;
+  return String(value);
+};
+
+const createSheet = (name: string, rows: SpreadsheetRow[], headers: string[]) => ({
+  sheet: name,
+  columns: headers.map(header => ({ width: Math.min(Math.max(header.length + 3, 14), 28) })),
+  data: [
+    headers.map(value => ({ value, fontWeight: 'bold' as const, backgroundColor: '#EAF0F8' })),
+    ...rows.map(row => headers.map(header => toCellValue(row[header])))
+  ]
+});
+
+const readSheetRows = (sheets: Array<{ sheet: string; data: SpreadsheetCell[][] }>, sheetName: string): SpreadsheetRow[] => {
+  const sheet = sheets.find(item => item.sheet === sheetName);
+  if (!sheet) throw new Error(`A aba "${sheetName}" não foi encontrada.`);
+  const [headerRow, ...dataRows] = sheet.data;
+  const headers = (headerRow || []).map(value => toString(value));
+  return dataRows
+    .filter(row => row.some(value => value !== null && value !== undefined && value !== ''))
+    .map(row => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? null])));
+};
+
+const parseExcelBackup = async (file: File) => {
+  const sheets = await readExcelFile(file) as Array<{ sheet: string; data: SpreadsheetCell[][] }>;
+  const metadata = readSheetRows(sheets, 'Metadados');
+  const format = metadata.find(row => row.chave === 'formato')?.valor;
+  const version = metadata.find(row => row.chave === 'versao')?.valor;
+  if (format !== 'CMV Hoteis Backup' || String(version) !== '1') {
+    throw new Error('Este arquivo não é um backup Excel válido do CMV Hotéis.');
+  }
+
+  const profile = readSheetRows(sheets, 'Perfil')[0];
+  if (!profile) throw new Error('O perfil do backup não foi encontrado.');
+
+  const fichaRows = readSheetRows(sheets, 'Fichas');
+  const ingredientes = readSheetRows(sheets, 'IngredientesFicha');
+  const metaCurrentUnit = toString(metadata.find(row => row.chave === 'unidadeAtiva')?.valor);
+
+  return {
+    currentUnit: metaCurrentUnit || 'AeB Villa Mayor',
+    user: {
+      id: toString(profile.id) || undefined,
+      nome: toString(profile.nome),
+      email: toString(profile.email),
+      cargo: toString(profile.cargo),
+      estabelecimento: toString(profile.estabelecimento),
+      metaFCP: toNumber(profile.metaFCP)
+    },
+    users: readSheetRows(sheets, 'Usuarios').map(row => ({
+      id: toString(row.id) || undefined,
+      nome: toString(row.nome), email: toString(row.email), cargo: toString(row.cargo),
+      estabelecimento: toString(row.estabelecimento), metaFCP: toNumber(row.metaFCP), senha: toString(row.senha) || undefined
+    })),
+    allInsumos: readSheetRows(sheets, 'Insumos').map(row => ({
+      id: toString(row.id), nome: toString(row.nome), categoria: toString(row.categoria),
+      unidadeMedida: toString(row.unidadeMedida), custoMedio: toNumber(row.custoMedio),
+      valorEmbalagem: toOptionalNumber(row.valorEmbalagem), conteudoEmbalagem: toOptionalNumber(row.conteudoEmbalagem),
+      estoqueAtual: toNumber(row.estoqueAtual), estoqueMinimo: toNumber(row.estoqueMinimo),
+      fornecedor: toString(row.fornecedor) || undefined, unidade: toString(row.unidade) || undefined
+    })),
+    allFichas: fichaRows.map(row => ({
+      id: toString(row.id), nome: toString(row.nome), categoria: toString(row.categoria),
+      precoVenda: toNumber(row.precoVenda), rendimentoPorcoes: toNumber(row.rendimentoPorcoes, 1),
+      descricao: toString(row.descricao) || undefined, unidade: toString(row.unidade) || undefined,
+      ingredientes: ingredientes.filter(item => toString(item.fichaId) === toString(row.id)).map(item => ({
+        insumoId: toString(item.insumoId), quantidade: toNumber(item.quantidade)
+      }))
+    })),
+    allMovimentacoes: readSheetRows(sheets, 'Movimentacoes').map(row => ({
+      id: toString(row.id), insumoId: toString(row.insumoId), insumoNome: toString(row.insumoNome),
+      tipo: toString(row.tipo), quantidade: toNumber(row.quantidade), custoUnitario: toOptionalNumber(row.custoUnitario),
+      custoTotal: toNumber(row.custoTotal), data: toString(row.data), observacao: toString(row.observacao) || undefined,
+      unidade: toString(row.unidade) || undefined
+    })),
+    allVendas: readSheetRows(sheets, 'Vendas').map(row => ({
+      id: toString(row.id), fichaId: toString(row.fichaId), fichaNome: toString(row.fichaNome),
+      quantidade: toNumber(row.quantidade), precoVendaUnitario: toNumber(row.precoVendaUnitario),
+      receitaTotal: toNumber(row.receitaTotal), custoInsumosTotal: toNumber(row.custoInsumosTotal),
+      data: toString(row.data), unidade: toString(row.unidade) || undefined
+    }))
+  };
+};
+
 export const Relatorios: React.FC = () => {
   const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, resetData, importarDados, exportarDados } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
@@ -25,7 +135,7 @@ export const Relatorios: React.FC = () => {
   const [shockPercentage, setShockPercentage] = useState('20'); // ex: +20% no custo do insumo
 
   // Estado do importador
-  const [importText, setImportText] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showImportArea, setShowImportArea] = useState(false);
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
@@ -49,34 +159,55 @@ export const Relatorios: React.FC = () => {
   const cmvRealPerc = receitaAcumulada > 0 ? (cmvOperacionalReal / receitaAcumulada) * 100 : 0;
   const desperdicioFaturamentoPerc = receitaAcumulada > 0 ? (totalDesperdicioAcumulado / receitaAcumulada) * 100 : 0;
 
-  // 2. Exportar banco de dados como arquivo JSON
-  const handleExportData = () => {
-    const backupJson = exportarDados();
+  // 2. Exportar o backup completo em abas Excel para auditoria e restauração.
+  const handleExportData = async () => {
+    const backup = JSON.parse(exportarDados());
 
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(backupJson);
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `chefcost-backup-${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    const sheets = [
+      createSheet('Metadados', [
+      { chave: 'formato', valor: 'CMV Hoteis Backup' },
+      { chave: 'versao', valor: 1 },
+      { chave: 'exportadoEm', valor: new Date().toISOString() },
+      { chave: 'unidadeAtiva', valor: backup.currentUnit }
+      ], ['chave', 'valor']),
+      createSheet('Perfil', [backup.user], USUARIO_HEADERS.filter(header => header !== 'senha')),
+      createSheet('Usuarios', backup.users || [], USUARIO_HEADERS),
+      createSheet('Insumos', backup.allInsumos || [], INSUMO_HEADERS),
+      createSheet('Fichas', (backup.allFichas || []).map(({ ingredientes, ...ficha }: SpreadsheetRow & { ingredientes?: unknown[] }) => ficha), FICHA_HEADERS),
+      createSheet('IngredientesFicha', (backup.allFichas || []).flatMap((ficha: SpreadsheetRow & { ingredientes?: Array<{ insumoId: string; quantidade: number }> }) =>
+      (ficha.ingredientes || []).map(ingrediente => ({ fichaId: ficha.id, ...ingrediente }))
+      ), INGREDIENTE_HEADERS),
+      createSheet('Movimentacoes', backup.allMovimentacoes || [], MOVIMENTACAO_HEADERS),
+      createSheet('Vendas', backup.allVendas || [], VENDA_HEADERS)
+    ];
+
+    await writeExcelFile(sheets).toFile(`cmv-hoteis-backup-${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  // 3. Importar dados colados
-  const handleImportSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // 3. Importar um backup Excel gerado pelo próprio sistema.
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (isColaborador) return;
-    if (!importText) return;
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
 
-    const success = importarDados(importText);
+    let success = false;
+    try {
+      const backup = await parseExcelBackup(file);
+      success = importarDados(JSON.stringify(backup));
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Não foi possível ler este arquivo Excel.');
+      setImportSuccess('');
+      return;
+    }
+
     if (success) {
       setImportSuccess('Dados importados com sucesso! O sistema foi atualizado.');
-      setImportText('');
       setImportError('');
       setShowImportArea(false);
       setTimeout(() => setImportSuccess(''), 4000);
     } else {
-      setImportError('Erro na importação. Certifique-se de colar um JSON válido.');
+      setImportError('Não foi possível restaurar os dados deste backup Excel.');
       setImportSuccess('');
     }
   };
@@ -299,10 +430,10 @@ export const Relatorios: React.FC = () => {
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <Download className="w-4.5 h-4.5 text-brand-navy" />
-              Exportar Backup JSON
+              Exportar Backup Excel
             </h4>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Baixe todas as suas receitas, ingredientes e histórico de movimentações em um único arquivo de segurança. Guarde seu banco de dados local.
+              Baixe receitas, ingredientes e histórico de movimentações em um arquivo Excel organizado por abas.
             </p>
             <button
               onClick={handleExportData}
@@ -315,10 +446,10 @@ export const Relatorios: React.FC = () => {
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <Upload className="w-4.5 h-4.5 text-brand-navy" />
-              Importar Backup JSON
+              Importar Backup Excel
             </h4>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Restaure um backup anterior colando os dados gerados pelo download de segurança para recompor o estoque.
+              Restaure um arquivo Excel gerado pelo download de segurança para recompor o estoque.
             </p>
             
             {!isColaborador ? (
@@ -362,34 +493,32 @@ export const Relatorios: React.FC = () => {
         </div>
 
         {showImportArea && !isColaborador && (
-          <form onSubmit={handleImportSubmit} className="mt-6 border-t border-slate-100 pt-4 space-y-3 animate-fadeIn">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Cole o conteúdo do JSON aqui:</label>
-              <textarea
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                rows={5}
-                required
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
-                placeholder='{"user": {...}, "insumos": [...]}'
-              />
-            </div>
+          <div className="mt-6 border-t border-slate-100 pt-4 space-y-3 animate-fadeIn">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+            <p className="text-xs text-slate-500">Selecione o arquivo <strong className="text-slate-700">.xlsx</strong> gerado pelo backup do CMV Hotéis.</p>
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
-                onClick={() => { setShowImportArea(false); setImportText(''); }}
+                onClick={() => setShowImportArea(false)}
                 className="px-3 py-1.5 bg-slate-100 text-slate-500 text-xs font-semibold rounded-lg cursor-pointer hover:bg-slate-200"
               >
                 Cancelar
               </button>
               <button
-                type="submit"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
                 className="px-4 py-1.5 bg-brand-navy hover:bg-brand-navy/90 text-white text-xs font-bold rounded-lg cursor-pointer transition-all shadow-sm"
               >
-                Carregar Backup
+                Selecionar Arquivo Excel
               </button>
             </div>
-          </form>
+          </div>
         )}
       </div>
     </div>
