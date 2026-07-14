@@ -39,6 +39,7 @@ export const Insumos: React.FC = () => {
   const [estoqueAtual, setEstoqueAtual] = useState('');
   const [estoqueMinimo, setEstoqueMinimo] = useState('');
   const [fornecedor, setFornecedor] = useState('');
+  const [validade, setValidade] = useState('');
 
   // Estados de feedback
   const [errorMsg, setErrorMsg] = useState('');
@@ -64,6 +65,7 @@ export const Insumos: React.FC = () => {
     setEstoqueAtual('');
     setEstoqueMinimo('');
     setFornecedor('');
+    setValidade('');
     setErrorMsg('');
   };
 
@@ -85,6 +87,7 @@ export const Insumos: React.FC = () => {
     setEstoqueAtual(ins.estoqueAtual.toString());
     setEstoqueMinimo(ins.estoqueMinimo.toString());
     setFornecedor(ins.fornecedor || '');
+    setValidade(ins.validade || '');
     setErrorMsg('');
     setShowForm(true);
   };
@@ -121,7 +124,8 @@ export const Insumos: React.FC = () => {
       custoMedio: custoCalculado,
       estoqueAtual: editingId ? Number(estoqueAtual) : Number(estoqueAtual || 0),
       estoqueMinimo: Number(estoqueMinimo),
-      fornecedor: fornecedor || undefined
+      fornecedor: fornecedor || undefined,
+      validade: validade || undefined
     };
 
     if (editingId) {
@@ -441,6 +445,15 @@ export const Insumos: React.FC = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Data de Validade</label>
+              <input
+                type="date"
+                value={validade}
+                onChange={(e) => setValidade(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+              />
+            </div>
             <div className="md:col-span-3 flex justify-end gap-2 pt-2 border-t border-slate-100 mt-2">
               <button
                 type="button"

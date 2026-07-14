@@ -9,7 +9,8 @@ import {
   TrendingDown,
   ChevronRight,
   Package,
-  ShoppingBag
+  ShoppingBag,
+  CalendarClock
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -37,6 +38,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   // 2. Alertas de Estoque Mínimo
   const itensAbaixoDoMinimo = insumos.filter(ins => ins.estoqueAtual < ins.estoqueMinimo);
   const quantidadeAlertas = itensAbaixoDoMinimo.length;
+
+  const getExpiryInfo = (expiryDate?: string) => {
+    if (!expiryDate) return null;
+    const today = new Date();
+    const startOfToday = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    const [year, month, day] = expiryDate.split('-').map(Number);
+    const days = Math.round((Date.UTC(year, month - 1, day) - startOfToday) / 86400000);
+    if (days < 0) return { days, label: `Vencido há ${Math.abs(days)} dia${Math.abs(days) === 1 ? '' : 's'}`, status: 'vencido' };
+    if (days === 0) return { days, label: 'Vence hoje', status: 'vencendo' };
+    if (days <= 30) return { days, label: `Vence em ${days} dia${days === 1 ? '' : 's'}`, status: 'proximo' };
+    return null;
+  };
+  const alertasValidade = insumos
+    .map(insumo => ({ insumo, info: getExpiryInfo(insumo.validade) }))
+    .filter((item): item is { insumo: typeof insumos[number]; info: NonNullable<ReturnType<typeof getExpiryInfo>> } => item.info !== null)
+    .sort((a, b) => a.info.days - b.info.days);
 
   // 3. Faturamento Acumulado e CMV das Vendas
   const faturamentoTotal = vendas.reduce((acc, v) => acc + v.receitaTotal, 0);
@@ -242,6 +259,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {alertasValidade.length > 0 && (
+        <div className="bg-white p-5 rounded-xl border border-amber-200 shadow-sm" id="expiry-alerts">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <CalendarClock className="w-5 h-5 text-amber-600" />
+                Alertas de Validade
+              </h3>
+              <p className="text-xs text-slate-500">Produtos vencidos, que vencem hoje ou nos próximos 30 dias.</p>
+            </div>
+            <button onClick={() => onNavigate('insumos')} className="text-xs text-brand-navy font-bold cursor-pointer flex items-center gap-1">
+              Ver insumos <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {alertasValidade.slice(0, 6).map(({ insumo, info }) => (
+              <div key={insumo.id} className={`p-3 rounded-lg border ${info.status === 'vencido' ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'}`}>
+                <span className="font-bold text-sm text-slate-800 block truncate">{insumo.nome}</span>
+                <span className={`text-xs font-bold ${info.status === 'vencido' ? 'text-rose-700' : 'text-amber-700'}`}>{info.label}</span>
+                <span className="text-[10px] text-slate-500 block mt-1">Validade: {new Date(`${insumo.validade}T00:00:00`).toLocaleDateString('pt-BR')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Alerta de Desperdício Impactando a Margem */}
       {desperdicioTotal > 0 && cmvRealPorcentagem > user.metaFCP && (

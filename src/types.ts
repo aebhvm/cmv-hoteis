@@ -9,6 +9,7 @@ export interface Insumo {
   estoqueAtual: number;
   estoqueMinimo: number;
   fornecedor?: string;
+  validade?: string; // Data de vencimento no formato YYYY-MM-DD
   unidade?: string;
 }
 
