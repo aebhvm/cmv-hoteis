@@ -175,6 +175,7 @@ const getInsumoQuantityCost = (insumo: Insumo, quantidade: number) => {
 
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const remoteStateReadyRef = useRef(false);
+  const remoteRevisionRef = useRef<string | null>(null);
 
   const [currentUnit, setCurrentUnitState] = useState<Unidade>(() => {
     const saved = localStorage.getItem('chef_current_unit');
@@ -267,16 +268,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     allVendas
   });
 
-  useEffect(() => {
+useEffect(() => {
     let active = true;
 
     fetch('/api/state')
       .then(async response => {
         if (!response.ok) throw new Error('Remote state unavailable');
-        return response.json() as Promise<Partial<AppStateSnapshot>>;
+        return response.json() as Promise<Partial<AppStateSnapshot> & { _revision?: string }>;
       })
       .then(data => {
         if (!active) return;
+        remoteRevisionRef.current = data._revision || null;
         if (data.currentUnit) setCurrentUnitState(data.currentUnit);
         if (data.user) setUser(data.user);
         if (Array.isArray(data.users)) setUsers(data.users);
@@ -284,14 +286,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (Array.isArray(data.allFichas)) setAllFichas(data.allFichas);
         if (Array.isArray(data.allMovimentacoes)) setAllMovimentacoes(data.allMovimentacoes);
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
+        remoteStateReadyRef.current = true;
       })
       .catch(() => {
-        // Local Vite dev does not serve Vercel functions. Keep localStorage as fallback.
-      })
-      .finally(() => {
-        setTimeout(() => {
-          remoteStateReadyRef.current = true;
-        }, 0);
+        // Keep local data for offline use. It must not overwrite the remote state.
       });
 
     return () => {
@@ -302,13 +300,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (!remoteStateReadyRef.current) return;
 
-    const timer = window.setTimeout(() => {
+const timer = window.setTimeout(() => {
       fetch('/api/state', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildSnapshot())
+        body: JSON.stringify({ ...buildSnapshot(), _revision: remoteRevisionRef.current })
+      }).then(async response => {
+        if (!response.ok) throw new Error('Remote state conflict or unavailable');
+        const saved = await response.json();
+        remoteRevisionRef.current = saved._revision || remoteRevisionRef.current;
       }).catch(() => {
-        // Offline/local fallback remains in localStorage.
+        // Local fallback remains available without replacing newer remote data.
       });
     }, 600);
 

@@ -80,7 +80,7 @@ export default async function handler(req: any, res: any) {
     await ensureSchema(sql);
 
     if (req.method === 'GET') {
-      const rows = await sql`SELECT data FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+      const rows = await sql`SELECT data, updated_at FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
       if (rows.length > 0) {
         const normalized = normalizeState(rows[0].data);
         if (JSON.stringify(normalized.allInsumos || []) !== JSON.stringify(rows[0].data.allInsumos || [])) {
@@ -90,7 +90,7 @@ export default async function handler(req: any, res: any) {
             WHERE id = ${APP_STATE_ID}
           `;
         }
-        return res.status(200).json(normalized);
+        return res.status(200).json({ ...normalized, _revision: rows[0].updated_at.toISOString() });
       }
 
       await sql`
@@ -106,16 +106,26 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: 'Invalid payload.' });
       }
 
-      const normalized = normalizeState(body);
+      const { _revision: revision, ...state } = body;
+      const normalized = normalizeState(state);
+      const current = await sql`SELECT data, updated_at FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
 
-      await sql`
+      if (current.length > 0 && (!revision || revision !== current[0].updated_at.toISOString())) {
+        return res.status(409).json({
+          error: 'State conflict.',
+          state: { ...normalizeState(current[0].data), _revision: current[0].updated_at.toISOString() }
+        });
+      }
+
+      const saved = await sql`
         INSERT INTO app_state (id, data, updated_at)
         VALUES (${APP_STATE_ID}, ${JSON.stringify(normalized)}::jsonb, now())
         ON CONFLICT (id)
         DO UPDATE SET data = excluded.data, updated_at = now()
+        RETURNING updated_at
       `;
 
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, _revision: saved[0].updated_at.toISOString() });
     }
 
     res.setHeader('Allow', 'GET, PUT');
