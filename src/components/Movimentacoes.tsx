@@ -45,6 +45,8 @@ export const Movimentacoes: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingMovId, setEditingMovId] = useState<string | null>(null);
   const [insumoId, setInsumoId] = useState('');
+  const [insumoSearchTerm, setInsumoSearchTerm] = useState('');
+  const [showInsumoSugestoes, setShowInsumoSugestoes] = useState(false);
   const [tipo, setTipo] = useState<'entrada' | 'saida' | 'desperdicio' | 'ajuste'>('entrada');
   const [quantidade, setQuantidade] = useState('');
   const [custoUnitario, setCustoUnitario] = useState('');
@@ -54,6 +56,24 @@ export const Movimentacoes: React.FC = () => {
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const normalizeSearch = (value: string) =>
+    value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  const insumoSugestoes = insumoSearchTerm.trim()
+    ? [...insumos]
+        .filter(ins => normalizeSearch(ins.nome).includes(normalizeSearch(insumoSearchTerm)))
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+        .slice(0, 8)
+    : [];
+
+  const handleSelectInsumo = (selectedId: string) => {
+    const ins = insumos.find(item => item.id === selectedId);
+    if (!ins) return;
+    setInsumoId(ins.id);
+    setInsumoSearchTerm(ins.nome);
+    setCustoUnitario(ins.custoMedio.toString());
+    setShowInsumoSugestoes(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +118,8 @@ export const Movimentacoes: React.FC = () => {
     }
 
     setInsumoId('');
+    setInsumoSearchTerm('');
+    setShowInsumoSugestoes(false);
     setQuantidade('');
     setCustoUnitario('');
     setObservacao('');
@@ -110,10 +132,12 @@ export const Movimentacoes: React.FC = () => {
   };
 
 
-  const handleOpenCreate = () => {
+  const handleOpenCreate = (initialType: 'entrada' | 'saida' = 'entrada') => {
     setEditingMovId(null);
     setInsumoId('');
-    setTipo('entrada');
+    setInsumoSearchTerm('');
+    setShowInsumoSugestoes(false);
+    setTipo(initialType);
     setQuantidade('');
     setCustoUnitario('');
     setObservacao('');
@@ -131,6 +155,8 @@ export const Movimentacoes: React.FC = () => {
     }
     setEditingMovId(id);
     setInsumoId(mov.insumoId);
+    setInsumoSearchTerm(insumos.find(item => item.id === mov.insumoId)?.nome || mov.insumoNome);
+    setShowInsumoSugestoes(false);
     setTipo(mov.tipo);
     setQuantidade(mov.quantidade.toString());
     setCustoUnitario(mov.custoUnitario?.toString() || '');
@@ -221,14 +247,26 @@ export const Movimentacoes: React.FC = () => {
           <h2 className="text-xl font-bold text-slate-800">Fluxo de Entradas, Saídas e Perdas</h2>
           <p className="text-xs text-slate-500">Lance compras, registre quebras ou desperdícios e audite o histórico de movimentações do restaurante</p>
         </div>
-        <button
-          onClick={() => showForm ? setShowForm(false) : handleOpenCreate()}
-          className="px-4 py-2 bg-brand-navy hover:bg-brand-navy/90 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-[1.01] cursor-pointer self-start sm:self-auto"
-          id="btn-lancar-mov"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          Registrar Movimentação
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => handleOpenCreate('entrada')}
+            className="px-4 py-2 bg-brand-navy hover:bg-brand-navy/90 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-[1.01] cursor-pointer"
+            id="btn-lancar-mov"
+          >
+            {isColaborador ? <TrendingUp className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
+            {isColaborador ? 'Entrada' : 'Registrar Movimentação'}
+          </button>
+          {isColaborador && (
+            <button
+              onClick={() => handleOpenCreate('saida')}
+              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-300 flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+              id="btn-lancar-saida"
+            >
+              <TrendingDown className="w-4 h-4 text-rose-600 stroke-[2.5]" />
+              Saída
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Feedbacks */}
@@ -289,14 +327,13 @@ export const Movimentacoes: React.FC = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tipo de Lançamento *</label>
               <select
                 value={tipo}
                 onChange={(e) => {
                   setTipo(e.target.value as any);
-                  if (e.target.value !== 'entrada') setCustoUnitario('');
                 }}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
               >
@@ -319,21 +356,73 @@ export const Movimentacoes: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Insumo Afetado *</label>
-              <select
-                value={insumoId}
-                onChange={(e) => setInsumoId(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
-                required
-              >
-                <option value="">-- Escolha um Insumo --</option>
-                {insumos.map(ins => (
-                  <option key={ins.id} value={ins.id}>
-                    {ins.nome} (Estoque atual: {ins.estoqueAtual} {ins.unidadeMedida})
-                  </option>
-                ))}
-              </select>
+            <div className="md:col-span-2">
+              <label htmlFor="mov-produto-search" className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Produto *</label>
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  id="mov-produto-search"
+                  type="text"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={showInsumoSugestoes && Boolean(insumoSearchTerm.trim())}
+                  aria-controls="mov-insumo-sugestoes"
+                  value={insumoSearchTerm}
+                  onChange={(e) => {
+                    setInsumoSearchTerm(e.target.value);
+                    setInsumoId('');
+                    setCustoUnitario('');
+                    setShowInsumoSugestoes(true);
+                  }}
+                  onFocus={() => setShowInsumoSugestoes(true)}
+                  onBlur={() => window.setTimeout(() => setShowInsumoSugestoes(false), 120)}
+                  className="w-full pl-9 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+                  placeholder="Digite o nome do produto..."
+                  autoComplete="off"
+                  required
+                />
+                {insumoSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInsumoSearchTerm('');
+                      setInsumoId('');
+                      setCustoUnitario('');
+                      setShowInsumoSugestoes(false);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
+                    aria-label="Limpar produto"
+                    title="Limpar produto"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+
+                {showInsumoSugestoes && insumoSearchTerm.trim() && (
+                  <div id="mov-insumo-sugestoes" role="listbox" className="absolute z-40 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl divide-y divide-slate-100">
+                    {insumoSugestoes.length > 0 ? (
+                      insumoSugestoes.map(ins => (
+                        <button
+                          key={ins.id}
+                          type="button"
+                          role="option"
+                          aria-selected={ins.id === insumoId}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSelectInsumo(ins.id)}
+                          className="w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <span className="block text-xs font-bold text-slate-800 break-words">{ins.nome}</span>
+                          <span className="block text-[10px] text-slate-500 font-mono">
+                            Estoque: {ins.estoqueAtual} {ins.unidadeMedida} - Custo: R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-3 text-xs text-slate-400">Nenhum produto encontrado.</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -391,7 +480,7 @@ export const Movimentacoes: React.FC = () => {
               />
             </div>
 
-            <div className="md:col-span-5 flex justify-end gap-2 pt-2 border-t border-slate-150 mt-2">
+            <div className="md:col-span-6 flex justify-end gap-2 pt-2 border-t border-slate-150 mt-2">
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditingMovId(null); }}
