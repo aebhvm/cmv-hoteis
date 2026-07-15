@@ -173,9 +173,63 @@ const getInsumoQuantityCost = (insumo: Insumo, quantidade: number) => {
   return quantidade * insumo.custoMedio;
 };
 
+
+type CollectionPatch = { upserts: any[]; deleted: string[] };
+type StatePatch = Partial<Pick<AppStateSnapshot, 'currentUnit' | 'user'>> & {
+  users?: CollectionPatch;
+  allInsumos?: CollectionPatch;
+  allFichas?: CollectionPatch;
+  allMovimentacoes?: CollectionPatch;
+  allVendas?: CollectionPatch;
+};
+
+const statesMatch = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+const entityKey = (item: any) => String(item?.id || item?.email || '');
+
+const buildCollectionPatch = (base: any[], next: any[]): CollectionPatch | undefined => {
+  const baseByKey = new Map(base.map(item => [entityKey(item), item]));
+  const nextByKey = new Map(next.map(item => [entityKey(item), item]));
+  const upserts = next.filter(item => !statesMatch(baseByKey.get(entityKey(item)), item));
+  const deleted = base.filter(item => !nextByKey.has(entityKey(item))).map(entityKey).filter(Boolean);
+  return upserts.length || deleted.length ? { upserts, deleted } : undefined;
+};
+
+const buildStatePatch = (base: AppStateSnapshot, next: AppStateSnapshot): StatePatch => {
+  const users = buildCollectionPatch(base.users, next.users);
+  const allInsumos = buildCollectionPatch(base.allInsumos, next.allInsumos);
+  const allFichas = buildCollectionPatch(base.allFichas, next.allFichas);
+  const allMovimentacoes = buildCollectionPatch(base.allMovimentacoes, next.allMovimentacoes);
+  const allVendas = buildCollectionPatch(base.allVendas, next.allVendas);
+  return {
+    ...(statesMatch(base.currentUnit, next.currentUnit) ? {} : { currentUnit: next.currentUnit }),
+    ...(statesMatch(base.user, next.user) ? {} : { user: next.user }),
+    ...(users ? { users } : {}),
+    ...(allInsumos ? { allInsumos } : {}),
+    ...(allFichas ? { allFichas } : {}),
+    ...(allMovimentacoes ? { allMovimentacoes } : {}),
+    ...(allVendas ? { allVendas } : {}),
+  };
+};
+
+const hasPatchChanges = (patch: StatePatch) => Object.keys(patch).length > 0;
+
+const snapshotFromRemote = (state: any): AppStateSnapshot => ({
+  currentUnit: state.currentUnit,
+  user: state.user,
+  users: state.users,
+  allInsumos: dedupeInsumosById(state.allInsumos || []),
+  allFichas: state.allFichas || [],
+  allMovimentacoes: state.allMovimentacoes || [],
+  allVendas: state.allVendas || [],
+});
+
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const remoteStateReadyRef = useRef(false);
   const remoteRevisionRef = useRef<string | null>(null);
+  const remoteBaseStateRef = useRef<AppStateSnapshot | null>(null);
+  const latestSnapshotRef = useRef<AppStateSnapshot | null>(null);
+  const syncInFlightRef = useRef(false);
+  const syncQueuedRef = useRef(false);
 
   const [currentUnit, setCurrentUnitState] = useState<Unidade>(() => {
     const saved = localStorage.getItem('chef_current_unit');
@@ -286,6 +340,7 @@ useEffect(() => {
         if (Array.isArray(data.allFichas)) setAllFichas(data.allFichas);
         if (Array.isArray(data.allMovimentacoes)) setAllMovimentacoes(data.allMovimentacoes);
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
+        remoteBaseStateRef.current = snapshotFromRemote(data);
         remoteStateReadyRef.current = true;
       })
       .catch(() => {
@@ -298,21 +353,53 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
+    latestSnapshotRef.current = buildSnapshot();
+  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas]);
+
+  useEffect(() => {
     if (!remoteStateReadyRef.current) return;
 
-const timer = window.setTimeout(() => {
-      fetch('/api/state', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...buildSnapshot(), _revision: remoteRevisionRef.current })
-      }).then(async response => {
-        if (!response.ok) throw new Error('Remote state conflict or unavailable');
-        const saved = await response.json();
-        remoteRevisionRef.current = saved._revision || remoteRevisionRef.current;
-      }).catch(() => {
-        // Local fallback remains available without replacing newer remote data.
-      });
-    }, 600);
+    const syncChanges = async () => {
+      if (syncInFlightRef.current) {
+        syncQueuedRef.current = true;
+        return;
+      }
+
+      const snapshot = latestSnapshotRef.current;
+      const base = remoteBaseStateRef.current;
+      if (!snapshot || !base) return;
+
+      const patch = buildStatePatch(base, snapshot);
+      if (!hasPatchChanges(patch)) return;
+
+      syncInFlightRef.current = true;
+      let saved = false;
+      try {
+        const response = await fetch('/api/state', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patch })
+        });
+        if (!response.ok) throw new Error('Remote state unavailable');
+
+        const result = await response.json();
+        remoteRevisionRef.current = result.state?._revision || remoteRevisionRef.current;
+        remoteBaseStateRef.current = snapshotFromRemote(result.state);
+        saved = true;
+      } catch (error) {
+        console.error('Unable to save changes.', error);
+      } finally {
+        syncInFlightRef.current = false;
+        if (saved && syncQueuedRef.current) {
+          syncQueuedRef.current = false;
+          void syncChanges();
+        }
+      }
+    };
+
+    const timer = window.setTimeout(() => {
+      void syncChanges();
+    }, 400);
 
     return () => window.clearTimeout(timer);
   }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas]);

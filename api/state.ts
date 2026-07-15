@@ -74,6 +74,39 @@ const normalizeState = (state: any) => {
   };
 };
 
+const collectionKeys = ['users', 'allInsumos', 'allFichas', 'allMovimentacoes', 'allVendas'] as const;
+
+const getEntityKey = (item: any) => String(item?.id || item?.email || '');
+
+const mergeCollection = (current: any[], patch: any) => {
+  const deleted = new Set<string>(Array.isArray(patch?.deleted) ? patch.deleted : []);
+  const upserts = Array.isArray(patch?.upserts) ? patch.upserts : [];
+  const upsertsByKey = new Map(upserts.map((item: any) => [getEntityKey(item), item]));
+  const merged = current
+    .filter(item => !deleted.has(getEntityKey(item)))
+    .map(item => upsertsByKey.get(getEntityKey(item)) || item);
+
+  upserts.forEach((item: any) => {
+    const key = getEntityKey(item);
+    if (key && !current.some(existing => getEntityKey(existing) === key)) merged.push(item);
+  });
+
+  return merged;
+};
+
+const applyPatch = (currentState: any, patch: any) => {
+  const nextState = { ...currentState };
+
+  if (patch.currentUnit !== undefined) nextState.currentUnit = patch.currentUnit;
+  if (patch.user !== undefined) nextState.user = patch.user;
+
+  collectionKeys.forEach(key => {
+    if (patch[key]) nextState[key] = mergeCollection(Array.isArray(currentState[key]) ? currentState[key] : [], patch[key]);
+  });
+
+  return nextState;
+};
+
 export default async function handler(req: any, res: any) {
   try {
     const sql = getSql();
@@ -83,14 +116,17 @@ export default async function handler(req: any, res: any) {
       const rows = await sql`SELECT data, updated_at FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
       if (rows.length > 0) {
         const normalized = normalizeState(rows[0].data);
+        let revision = rows[0].updated_at;
         if (JSON.stringify(normalized.allInsumos || []) !== JSON.stringify(rows[0].data.allInsumos || [])) {
-          await sql`
+          const saved = await sql`
             UPDATE app_state
             SET data = ${JSON.stringify(normalized)}::jsonb, updated_at = now()
             WHERE id = ${APP_STATE_ID}
+            RETURNING updated_at
           `;
+          revision = saved[0].updated_at;
         }
-        return res.status(200).json({ ...normalized, _revision: rows[0].updated_at.toISOString() });
+        return res.status(200).json({ ...normalized, _revision: revision.toISOString() });
       }
 
       await sql`
@@ -98,6 +134,42 @@ export default async function handler(req: any, res: any) {
         VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
       `;
       return res.status(200).json(initialState);
+    }
+
+    if (req.method === 'PATCH') {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      if (!body?.patch || typeof body.patch !== 'object') {
+        return res.status(400).json({ error: 'Invalid patch.' });
+      }
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const current = await sql`SELECT data, updated_at FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+        if (current.length === 0) {
+          await sql`
+            INSERT INTO app_state (id, data)
+            VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
+            ON CONFLICT (id) DO NOTHING
+          `;
+          continue;
+        }
+
+        const nextState = normalizeState(applyPatch(current[0].data, body.patch));
+        const saved = await sql`
+          UPDATE app_state
+          SET data = ${JSON.stringify(nextState)}::jsonb, updated_at = now()
+          WHERE id = ${APP_STATE_ID} AND updated_at = ${current[0].updated_at}
+          RETURNING data, updated_at
+        `;
+
+        if (saved.length > 0) {
+          return res.status(200).json({
+            ok: true,
+            state: { ...normalizeState(saved[0].data), _revision: saved[0].updated_at.toISOString() }
+          });
+        }
+      }
+
+      return res.status(409).json({ error: 'Unable to apply changes. Please retry.' });
     }
 
     if (req.method === 'PUT') {
@@ -128,7 +200,7 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ ok: true, _revision: saved[0].updated_at.toISOString() });
     }
 
-    res.setHeader('Allow', 'GET, PUT');
+    res.setHeader('Allow', 'GET, PUT, PATCH');
     return res.status(405).json({ error: 'Method not allowed.' });
   } catch (error) {
     console.error(error);
