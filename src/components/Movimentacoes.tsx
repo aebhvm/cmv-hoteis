@@ -45,7 +45,7 @@ export const Movimentacoes: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingMovId, setEditingMovId] = useState<string | null>(null);
   const [insumoId, setInsumoId] = useState('');
-  const [tipo, setTipo] = useState<'entrada' | 'saida' | 'desperdicio' | 'ajuste'>(() => isColaborador ? 'saida' : 'entrada');
+  const [tipo, setTipo] = useState<'entrada' | 'saida' | 'desperdicio' | 'ajuste'>('entrada');
   const [quantidade, setQuantidade] = useState('');
   const [custoUnitario, setCustoUnitario] = useState('');
   const [observacao, setObservacao] = useState('');
@@ -57,8 +57,8 @@ export const Movimentacoes: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isColaborador && (tipo === 'entrada' || tipo === 'ajuste')) {
-      setErrorMsg('Colaboradores podem registrar apenas saidas e desperdicios.');
+    if (isColaborador && tipo === 'ajuste') {
+      setErrorMsg('Ajustes de estoque são exclusivos do Gestor.');
       return;
     }
 
@@ -113,7 +113,7 @@ export const Movimentacoes: React.FC = () => {
   const handleOpenCreate = () => {
     setEditingMovId(null);
     setInsumoId('');
-    setTipo(isColaborador ? 'saida' : 'entrada');
+    setTipo('entrada');
     setQuantidade('');
     setCustoUnitario('');
     setObservacao('');
@@ -125,8 +125,8 @@ export const Movimentacoes: React.FC = () => {
   const handleOpenEdit = (id: string) => {
     const mov = movimentacoes.find(m => m.id === id);
     if (!mov) return;
-    if (isColaborador && (mov.tipo === 'entrada' || mov.tipo === 'ajuste')) {
-      setErrorMsg('Colaboradores podem editar apenas saidas e desperdicios.');
+    if (isColaborador && mov.tipo === 'ajuste') {
+      setErrorMsg('Ajustes de estoque são exclusivos do Gestor.');
       return;
     }
     setEditingMovId(id);
@@ -143,8 +143,8 @@ export const Movimentacoes: React.FC = () => {
   const handleDeleteMov = (id: string) => {
     const mov = movimentacoes.find(m => m.id === id);
     if (!mov) return;
-    if (isColaborador && (mov.tipo === 'entrada' || mov.tipo === 'ajuste')) {
-      setErrorMsg('Colaboradores podem excluir apenas saidas e desperdicios.');
+    if (isColaborador && mov.tipo === 'ajuste') {
+      setErrorMsg('Ajustes de estoque são exclusivos do Gestor.');
       return;
     }
     if (!window.confirm('Deseja excluir esta movimentacao e reverter o estoque?')) return;
@@ -300,7 +300,7 @@ export const Movimentacoes: React.FC = () => {
                 }}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
               >
-                {!isColaborador && <option value="entrada">Entrada (Compra / Reposicao)</option>}
+                <option value="entrada">Entrada (Compra / Reposicao)</option>
                 <option value="saida">Saída (Consumo / Brinde / Degustação)</option>
                 <option value="desperdicio">Desperdício (Perda / Erro / Preparo)</option>
                 {!isColaborador && <option value="ajuste">Ajuste de Estoque (Inventario Fisico)</option>}
