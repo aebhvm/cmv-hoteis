@@ -399,7 +399,7 @@ useEffect(() => {
 
     const timer = window.setTimeout(() => {
       void syncChanges();
-    }, 400);
+    }, 100);
 
     return () => window.clearTimeout(timer);
   }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas]);

@@ -50,9 +50,11 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
     CREATE TABLE IF NOT EXISTS app_state (
       id text PRIMARY KEY,
       data jsonb NOT NULL,
-      updated_at timestamptz NOT NULL DEFAULT now()
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      revision bigint NOT NULL DEFAULT 0
     )
   `;
+  await sql`ALTER TABLE app_state ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0`;
 };
 
 const dedupeInsumosById = (items: any[]) => {
@@ -113,27 +115,27 @@ export default async function handler(req: any, res: any) {
     await ensureSchema(sql);
 
     if (req.method === 'GET') {
-      const rows = await sql`SELECT data, updated_at FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+      const rows = await sql`SELECT data, updated_at, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
       if (rows.length > 0) {
         const normalized = normalizeState(rows[0].data);
-        let revision = rows[0].updated_at;
+        let revision = rows[0].revision;
         if (JSON.stringify(normalized.allInsumos || []) !== JSON.stringify(rows[0].data.allInsumos || [])) {
           const saved = await sql`
             UPDATE app_state
-            SET data = ${JSON.stringify(normalized)}::jsonb, updated_at = now()
+            SET data = ${JSON.stringify(normalized)}::jsonb, updated_at = now(), revision = revision + 1
             WHERE id = ${APP_STATE_ID}
-            RETURNING updated_at
+            RETURNING revision
           `;
-          revision = saved[0].updated_at;
+          revision = saved[0].revision;
         }
-        return res.status(200).json({ ...normalized, _revision: revision.toISOString() });
+        return res.status(200).json({ ...normalized, _revision: String(revision) });
       }
 
       await sql`
         INSERT INTO app_state (id, data)
         VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
       `;
-      return res.status(200).json(initialState);
+      return res.status(200).json({ ...initialState, _revision: '0' });
     }
 
     if (req.method === 'PATCH') {
@@ -143,7 +145,7 @@ export default async function handler(req: any, res: any) {
       }
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        const current = await sql`SELECT data, updated_at FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+        const current = await sql`SELECT data, updated_at, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
         if (current.length === 0) {
           await sql`
             INSERT INTO app_state (id, data)
@@ -156,15 +158,15 @@ export default async function handler(req: any, res: any) {
         const nextState = normalizeState(applyPatch(current[0].data, body.patch));
         const saved = await sql`
           UPDATE app_state
-          SET data = ${JSON.stringify(nextState)}::jsonb, updated_at = now()
-          WHERE id = ${APP_STATE_ID} AND updated_at = ${current[0].updated_at}
-          RETURNING data, updated_at
+          SET data = ${JSON.stringify(nextState)}::jsonb, updated_at = now(), revision = revision + 1
+          WHERE id = ${APP_STATE_ID} AND revision = ${current[0].revision}
+          RETURNING data, updated_at, revision
         `;
 
         if (saved.length > 0) {
           return res.status(200).json({
             ok: true,
-            state: { ...normalizeState(saved[0].data), _revision: saved[0].updated_at.toISOString() }
+            state: { ...normalizeState(saved[0].data), _revision: String(saved[0].revision) }
           });
         }
       }
@@ -180,12 +182,12 @@ export default async function handler(req: any, res: any) {
 
       const { _revision: revision, ...state } = body;
       const normalized = normalizeState(state);
-      const current = await sql`SELECT data, updated_at FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+      const current = await sql`SELECT data, updated_at, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
 
-      if (current.length > 0 && (!revision || revision !== current[0].updated_at.toISOString())) {
+      if (current.length > 0 && (!revision || revision !== String(current[0].revision))) {
         return res.status(409).json({
           error: 'State conflict.',
-          state: { ...normalizeState(current[0].data), _revision: current[0].updated_at.toISOString() }
+          state: { ...normalizeState(current[0].data), _revision: String(current[0].revision) }
         });
       }
 
@@ -193,11 +195,11 @@ export default async function handler(req: any, res: any) {
         INSERT INTO app_state (id, data, updated_at)
         VALUES (${APP_STATE_ID}, ${JSON.stringify(normalized)}::jsonb, now())
         ON CONFLICT (id)
-        DO UPDATE SET data = excluded.data, updated_at = now()
-        RETURNING updated_at
+        DO UPDATE SET data = excluded.data, updated_at = now(), revision = app_state.revision + 1
+        RETURNING updated_at, revision
       `;
 
-      return res.status(200).json({ ok: true, _revision: saved[0].updated_at.toISOString() });
+      return res.status(200).json({ ok: true, _revision: String(saved[0].revision) });
     }
 
     res.setHeader('Allow', 'GET, PUT, PATCH');
