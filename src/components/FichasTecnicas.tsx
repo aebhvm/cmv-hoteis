@@ -275,7 +275,7 @@ export const FichasTecnicas: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6" id="fichas-tecnicas-view">
+    <div className="min-w-0 space-y-6" id="fichas-tecnicas-view">
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -610,8 +610,8 @@ export const FichasTecnicas: React.FC = () => {
         
         {/* Esquerda: Lista de Fichas por Categoria */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
-            <div className="relative flex-1">
+          <div className="min-w-0 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+            <div className="relative min-w-0 flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -627,12 +627,12 @@ export const FichasTecnicas: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700">
+            <div className="flex w-full min-w-0 items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 sm:w-auto">
               <span className="text-slate-400 font-medium">Categoria:</span>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-transparent text-slate-700 focus:outline-none cursor-pointer font-bold"
+                className="min-w-0 flex-1 bg-transparent text-slate-700 focus:outline-none cursor-pointer font-bold sm:flex-none"
               >
                 <option value="Todas">Todas</option>
                 {categoriasFichas.map(cat => (
@@ -642,7 +642,7 @@ export const FichasTecnicas: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-2.5 max-h-[580px] overflow-y-auto pr-1" id="fichas-scroll-container">
+          <div className="min-w-0 space-y-2.5 max-h-[580px] overflow-x-hidden overflow-y-auto pr-1" id="fichas-scroll-container">
             {filteredFichas.length === 0 ? (
               <div className="p-8 bg-slate-50 rounded-xl border border-slate-200 text-center text-slate-400 text-sm">
                 Nenhuma receita cadastrada nesta categoria.
@@ -662,43 +662,43 @@ export const FichasTecnicas: React.FC = () => {
                       setActiveFichaId(f.id);
                       setSimulacaoPrecoVenda(null); // resetar simulação ao mudar de ficha
                     }}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer relative group flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                    className={`relative min-w-0 overflow-hidden p-3 sm:p-4 rounded-xl border transition-all cursor-pointer group flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 ${
                       activeFichaId === f.id 
                         ? 'bg-brand-navy/5 border-brand-navy shadow-sm' 
                         : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                     }`}
                   >
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-base text-slate-800">{f.nome}</span>
+                    <div className="w-full min-w-0 flex-1 space-y-1 pr-16 md:pr-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="min-w-0 break-words font-bold text-base text-slate-800">{f.nome}</span>
                         <span className="px-2 py-0.5 bg-slate-100 text-[10px] font-semibold rounded text-slate-500">
                           {f.categoria}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 truncate max-w-[280px] md:max-w-[360px]">
+                      <p className="max-w-full truncate text-xs text-slate-500 md:max-w-[360px]">
                         {f.descricao || 'Sem descrição cadastrada'}
                       </p>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-400">
                         <span className="font-semibold">{f.ingredientes.length} ingredientes</span>
                         <span>•</span>
                         <span>Rendimento: {f.rendimentoPorcoes} {f.rendimentoPorcoes > 1 ? 'porções' : 'porção'}</span>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4 md:gap-6 font-mono text-right shrink-0">
-                      <div>
+                    <div className="grid w-full min-w-0 grid-cols-3 items-start gap-2 font-mono text-center sm:gap-4 md:w-auto md:flex md:shrink-0 md:flex-wrap md:items-center md:gap-6 md:text-right">
+                      <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 block uppercase">Custo Receita</span>
-                        <span className="text-sm font-bold text-slate-700">R$ {custo.toFixed(2)}</span>
+                        <span className="whitespace-nowrap text-sm font-bold text-slate-700">R$ {custo.toFixed(2)}</span>
                       </div>
 
-                      <div>
+                      <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 block uppercase">Preço Venda</span>
-                        <span className="text-sm font-bold text-brand-navy">R$ {f.precoVenda.toFixed(2)}</span>
+                        <span className="whitespace-nowrap text-sm font-bold text-brand-navy">R$ {f.precoVenda.toFixed(2)}</span>
                       </div>
 
-                      <div className="min-w-[70px]">
+                      <div className="min-w-0 md:min-w-[70px]">
                         <span className="text-[10px] text-slate-400 block uppercase">CMV Teórico</span>
-                        <span className={`text-sm font-bold flex items-center justify-end gap-1 ${
+                        <span className={`flex items-center justify-center gap-1 whitespace-nowrap text-sm font-bold md:justify-end ${
                           fcpPerigoso ? 'text-rose-600' : 'text-emerald-600'
                         }`}>
                           {fcpPerigoso && <AlertTriangle className="w-3.5 h-3.5" title="CMV acima da meta gerencial!" />}
@@ -708,10 +708,10 @@ export const FichasTecnicas: React.FC = () => {
 
                       {/* Ações - Somente Gestor */}
                       {!isColaborador && (
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <div className="absolute right-3 top-3 flex items-center gap-1 md:static" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleOpenEdit(f)}
-                            className="p-1.5 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-850 rounded-lg border border-slate-200 cursor-pointer shadow-sm"
+                            className="p-1.5 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 rounded-lg border border-slate-200 cursor-pointer shadow-sm"
                             title="Editar Ficha"
                           >
                             <Edit2 className="w-3.5 h-3.5" />

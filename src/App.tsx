@@ -291,7 +291,7 @@ function AppContent() {
         </header>
 
         {/* Corpo da Visão Ativa */}
-        <div className="flex-1 overflow-y-auto p-6" id="view-container">
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6" id="view-container">
           {renderActiveView()}
         </div>
       </main>
