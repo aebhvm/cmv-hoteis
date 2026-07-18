@@ -30,7 +30,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas } = useStock();
+  const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, addMovimentacao } = useStock();
+  const [discardingIds, setDiscardingIds] = React.useState<string[]>([]);
 
   // 1. Valor Total do Estoque Ativo
   const valorTotalEstoque = insumos.reduce((acc, ins) => acc + (ins.estoqueAtual * ins.custoMedio), 0);
@@ -52,8 +53,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   };
   const alertasValidade = insumos
     .map(insumo => ({ insumo, info: getExpiryInfo(insumo.validade) }))
-    .filter((item): item is { insumo: typeof insumos[number]; info: NonNullable<ReturnType<typeof getExpiryInfo>> } => item.info !== null)
+    .filter((item): item is { insumo: typeof insumos[number]; info: NonNullable<ReturnType<typeof getExpiryInfo>> } => item.info !== null && item.insumo.estoqueAtual > 0)
     .sort((a, b) => a.info.days - b.info.days);
+
+  const handleDiscardExpired = (insumo: typeof insumos[number]) => {
+    if (insumo.estoqueAtual <= 0 || discardingIds.includes(insumo.id)) return;
+
+    const quantity = insumo.estoqueAtual;
+    const confirmed = window.confirm(
+      `Confirmar descarte de ${quantity} ${insumo.unidadeMedida} de ${insumo.nome}?\n\nA saida sera registrada no historico como desperdicio por validade vencida.`
+    );
+    if (!confirmed) return;
+
+    setDiscardingIds(ids => [...ids, insumo.id]);
+    addMovimentacao({
+      insumoId: insumo.id,
+      tipo: 'desperdicio',
+      quantidade: quantity,
+      custoUnitario: insumo.custoMedio,
+      observacao: 'Descarte automatico por validade vencida'
+    });
+  };
 
   // 3. Faturamento Acumulado e CMV das Vendas
   const faturamentoTotal = vendas.reduce((acc, v) => acc + v.receitaTotal, 0);
@@ -280,6 +300,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <span className="font-bold text-sm text-slate-800 block truncate">{insumo.nome}</span>
                 <span className={`text-xs font-bold ${info.status === 'vencido' ? 'text-rose-700' : 'text-amber-700'}`}>{info.label}</span>
                 <span className="text-[10px] text-slate-500 block mt-1">Validade: {new Date(`${insumo.validade}T00:00:00`).toLocaleDateString('pt-BR')}</span>
+                <span className="text-[10px] text-slate-500 block">Estoque: {insumo.estoqueAtual} {insumo.unidadeMedida}</span>
+                {info.status === 'vencido' && (
+                  <button
+                    type="button"
+                    onClick={() => handleDiscardExpired(insumo)}
+                    disabled={discardingIds.includes(insumo.id)}
+                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {discardingIds.includes(insumo.id) ? 'Registrando descarte...' : 'Descartar estoque'}
+                  </button>
+                )}
               </div>
             ))}
           </div>

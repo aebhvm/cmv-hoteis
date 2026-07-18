@@ -8,8 +8,8 @@ interface AuthSimProps {
 
 export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
   const { users, registerUser, updateUser } = useStock();
-  const [email, setEmail] = useState('gerenteataide@gmail.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [nome, setNome] = useState('');
   const [cargo, setCargo] = useState<'Gestor' | 'Colaborador'>('Gestor');
@@ -48,6 +48,7 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
 
       setSuccessMsg('Usuário cadastrado com sucesso! Faça login abaixo.');
       setIsRegister(false);
+      setEmail('');
       setPassword('');
       return;
     }
@@ -105,7 +106,7 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           <div className="space-y-1">
             <h2 className="text-base font-bold text-slate-800 tracking-tight">
               {isRegister ? 'Criar Nova Credencial' : 'Entrar na Plataforma'}
