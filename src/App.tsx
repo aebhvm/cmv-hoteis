@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StockProvider, useStock } from './context/StockContext';
 import { AuthSim } from './components/AuthSim';
+import { InstallAppPrompt } from './components/InstallAppPrompt';
 import { Dashboard } from './components/Dashboard';
 import { Insumos } from './components/Insumos';
 import { FichasTecnicas } from './components/FichasTecnicas';
@@ -303,6 +304,7 @@ export default function App() {
   return (
     <StockProvider>
       <AppContent />
+      <InstallAppPrompt />
     </StockProvider>
   );
 }

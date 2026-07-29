@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#162E5B"/>
+  <path d="M91 85v171l51-40 114 128 114-128 51 40V85L256 168z" fill="#fff"/>
+  <path d="M112 77h288L256 192z" fill="#C2A45C"/>
+  <text x="256" y="442" fill="#fff" font-family="Arial,sans-serif" font-size="48" font-weight="700" text-anchor="middle">VM</text>
+</svg>
