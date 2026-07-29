@@ -1,6 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 
 const APP_STATE_ID = 'cmv-hoteis';
+const MAX_BODY_BYTES = 2_000_000;
+const MAX_COLLECTION_ITEMS = 20_000;
 
 const initialState = {
   currentUnit: 'AeB Villa Mayor',
@@ -78,7 +80,45 @@ const normalizeState = (state: any) => {
 
 const collectionKeys = ['users', 'allInsumos', 'allFichas', 'allMovimentacoes', 'allVendas'] as const;
 
+const isPlainObject = (value: unknown): value is Record<string, any> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const isValidCollectionPatch = (value: unknown) => {
+  if (!isPlainObject(value)) return false;
+  if (Object.keys(value).some(key => key !== 'upserts' && key !== 'deleted')) return false;
+  if (value.upserts !== undefined && !Array.isArray(value.upserts)) return false;
+  if (value.deleted !== undefined && !Array.isArray(value.deleted)) return false;
+  const upserts = value.upserts || [];
+  const deleted = value.deleted || [];
+  return upserts.length <= MAX_COLLECTION_ITEMS
+    && deleted.length <= MAX_COLLECTION_ITEMS
+    && upserts.every(isPlainObject)
+    && deleted.every(item => typeof item === 'string' && item.length <= 200);
+};
+
+const isValidPatch = (value: unknown) => {
+  if (!isPlainObject(value)) return false;
+  const allowedKeys = new Set(['currentUnit', 'user', ...collectionKeys]);
+  if (Object.keys(value).some(key => !allowedKeys.has(key))) return false;
+  if (value.currentUnit !== undefined && value.currentUnit !== 'AeB Villa Mayor' && value.currentUnit !== 'VM Cumbuco') return false;
+  if (value.user !== undefined && !isPlainObject(value.user)) return false;
+  return collectionKeys.every(key => value[key] === undefined || isValidCollectionPatch(value[key]));
+};
+
 const getEntityKey = (item: any) => String(item?.id || item?.email || '');
+
+const readJsonBody = (req: any) => {
+  const contentLength = Number(req.headers?.['content-length'] || 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) return null;
+  if (typeof req.body !== 'string') return req.body;
+  if (req.body.length > MAX_BODY_BYTES) return null;
+  try {
+    return JSON.parse(req.body);
+  } catch {
+    return null;
+  }
+};
 
 const mergeCollection = (current: any[], patch: any) => {
   const deleted = new Set<string>(Array.isArray(patch?.deleted) ? patch.deleted : []);
@@ -110,6 +150,9 @@ const applyPatch = (currentState: any, patch: any) => {
 };
 
 export default async function handler(req: any, res: any) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
   try {
     const sql = getSql();
     await ensureSchema(sql);
@@ -139,8 +182,8 @@ export default async function handler(req: any, res: any) {
     }
 
     if (req.method === 'PATCH') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      if (!body?.patch || typeof body.patch !== 'object') {
+      const body = readJsonBody(req);
+      if (!body?.patch || !isValidPatch(body.patch)) {
         return res.status(400).json({ error: 'Invalid patch.' });
       }
 
@@ -175,7 +218,7 @@ export default async function handler(req: any, res: any) {
     }
 
     if (req.method === 'PUT') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const body = readJsonBody(req);
       if (!body || typeof body !== 'object') {
         return res.status(400).json({ error: 'Invalid payload.' });
       }
@@ -207,7 +250,7 @@ export default async function handler(req: any, res: any) {
   } catch (error) {
     console.error(error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Internal error.',
+      error: 'Internal server error.',
     });
   }
 }

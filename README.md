@@ -1,20 +1,28 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# CMV Hoteis
 
-# Run and deploy your AI Studio app
+Aplicacao web de controle de insumos, movimentacoes, fichas tecnicas, vendas e CMV para AeB Villa Mayor e VM Cumbuco.
 
-This contains everything you need to run your app locally.
+## Desenvolvimento local
 
-View your app in AI Studio: https://ai.studio/apps/2eaac758-bbec-4629-8b96-8c9adb6baec7
+1. Instale o Node.js LTS.
+2. Execute `npm install`.
+3. Copie `.env.example` para `.env.local` e configure `DATABASE_URL` apenas localmente ou na Vercel.
+4. Execute `npm run dev`.
 
-## Run Locally
+## Estrutura
 
-**Prerequisites:**  Node.js
+- `src/`: interface React, contexto de dados, tipos e componentes por modulo.
+- `api/`: funcoes serverless da Vercel; a connection string do Neon nunca vai para o cliente.
+- `database/`: referencia do schema do Neon.
+- `backups/`: backups locais ignorados pelo Git, quando necessarios para recuperacao.
 
+## Validacao
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- `npm run lint`
+- `npm run build`
+
+O estado operacional fica na tabela `app_state` do Neon. A API aplica limite de payload, validacao estrutural, controle de revisao e respostas genericas para nao expor detalhes internos.
+
+## Seguranca operacional
+
+Nunca versione `.env.local`, connection strings, senhas reais ou backups com credenciais. Configure segredos nas variaveis de ambiente da Vercel e mantenha o acesso ao projeto restrito.

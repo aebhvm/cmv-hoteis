@@ -1,7 +1,8 @@
 export default function handler(req: any, res: any) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.status(200).json({
     ok: true,
-    hasDatabaseUrl: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
     timestamp: new Date().toISOString(),
   });
 }
