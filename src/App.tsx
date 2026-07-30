@@ -7,6 +7,7 @@ import { Insumos } from './components/Insumos';
 import { FichasTecnicas } from './components/FichasTecnicas';
 import { Movimentacoes } from './components/Movimentacoes';
 import { Inventario } from './components/Inventario';
+import { Utensilios } from './components/Utensilios';
 import { Vendas } from './components/Vendas';
 import { Relatorios } from './components/Relatorios';
 import { Usuarios } from './components/Usuarios';
@@ -16,6 +17,7 @@ import {
   BookOpen, 
   ArrowUpDown, 
   ClipboardCheck, 
+  Utensils,
   ShoppingCart, 
   BarChart4, 
   LogOut, 
@@ -46,6 +48,7 @@ function AppContent() {
 
   const allTabs = [
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
+    { id: 'utensilios', label: 'Utensilios', icon: Utensils },
     { id: 'insumos', label: 'Insumos', icon: Boxes },
     { id: 'fichas', label: 'Fichas Técnicas', icon: BookOpen },
     { id: 'movimentacoes', label: 'Movimentações', icon: ArrowUpDown },
@@ -57,7 +60,7 @@ function AppContent() {
 
   const tabs = useMemo(() => {
     if (user.cargo !== 'Colaborador') return allTabs;
-    const colaboradorTabs = ['movimentacoes', 'inventario', 'vendas'];
+    const colaboradorTabs = ['movimentacoes', 'inventario', 'utensilios', 'vendas'];
     return allTabs.filter(tab => colaboradorTabs.includes(tab.id));
   }, [user.cargo]);
 
@@ -98,6 +101,8 @@ function AppContent() {
         return <Movimentacoes />;
       case 'inventario':
         return <Inventario />;
+      case 'utensilios':
+        return <Utensilios />;
       case 'vendas':
         return <Vendas />;
       case 'relatorios':

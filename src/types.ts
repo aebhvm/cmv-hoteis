@@ -62,3 +62,28 @@ export interface UserProfile {
   estabelecimento: string;
   metaFCP: number; // Meta de Food Cost Percentage / CMV % (ex: 30%)
 }
+
+export interface Utensilio {
+  id: string;
+  nome: string;
+  categoria: string;
+  unidadeMedida: 'un' | 'conjunto';
+  quantidadeAtual: number;
+  estoqueMinimo: number;
+  quantidadeContada?: number;
+  perdasAcumuladas: number;
+  dataUltimaContagem?: string;
+  observacao?: string;
+  unidade?: string;
+}
+
+export interface MovimentacaoUtensilio {
+  id: string;
+  utensilioId: string;
+  utensilioNome: string;
+  tipo: 'contagem' | 'perda';
+  quantidade: number;
+  data: string;
+  observacao?: string;
+  unidade?: string;
+}

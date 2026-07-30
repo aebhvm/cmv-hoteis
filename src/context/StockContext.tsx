@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile } from '../types';
+import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile, Utensilio, MovimentacaoUtensilio } from '../types';
 import {
   INITIAL_USER,
   INITIAL_INSUMOS,
@@ -16,7 +16,14 @@ interface StockContextType {
   fichas: FichaTecnica[];
   movimentacoes: Movimentacao[];
   vendas: VendaLog[];
+  utensilios: Utensilio[];
+  movimentacoesUtensilios: MovimentacaoUtensilio[];
   updateUser: (profile: Partial<UserProfile>) => void;
+  addUtensilio: (utensilio: Omit<Utensilio, 'id' | 'unidade' | 'perdasAcumuladas' | 'quantidadeContada' | 'dataUltimaContagem'>) => void;
+  updateUtensilio: (id: string, utensilio: Partial<Utensilio>) => void;
+  deleteUtensilio: (id: string) => boolean;
+  registrarContagemUtensilio: (id: string, quantidade: number, observacao?: string) => { success: boolean; error?: string };
+  registrarPerdaUtensilio: (id: string, quantidade: number, observacao?: string) => { success: boolean; error?: string };
   addInsumo: (insumo: Omit<Insumo, 'id'>) => void;
   updateInsumo: (id: string, insumo: Partial<Insumo>) => void;
   deleteInsumo: (id: string) => boolean;
@@ -71,6 +78,8 @@ type AppStateSnapshot = {
   allFichas: FichaTecnica[];
   allMovimentacoes: Movimentacao[];
   allVendas: VendaLog[];
+  allUtensilios: Utensilio[];
+  allMovimentacoesUtensilios: MovimentacaoUtensilio[];
 };
 
 const DEFAULT_USERS: Array<UserProfile & { senha?: string }> = [
@@ -133,7 +142,9 @@ const buildInitialCollections = () => {
     allInsumos: [...villaMayorInsumos, ...cumbucoInsumos],
     allFichas: [...villaMayorFichas, ...cumbucoFichas],
     allMovimentacoes: [...villaMayorMovs, ...cumbucoMovs],
-    allVendas: [...villaMayorVendas, ...cumbucoVendas]
+    allVendas: [...villaMayorVendas, ...cumbucoVendas],
+    allUtensilios: [],
+    allMovimentacoesUtensilios: []
   };
 };
 
@@ -181,6 +192,8 @@ type StatePatch = Partial<Pick<AppStateSnapshot, 'currentUnit' | 'user'>> & {
   allFichas?: CollectionPatch;
   allMovimentacoes?: CollectionPatch;
   allVendas?: CollectionPatch;
+  allUtensilios?: CollectionPatch;
+  allMovimentacoesUtensilios?: CollectionPatch;
 };
 
 const statesMatch = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
@@ -200,6 +213,8 @@ const buildStatePatch = (base: AppStateSnapshot, next: AppStateSnapshot): StateP
   const allFichas = buildCollectionPatch(base.allFichas, next.allFichas);
   const allMovimentacoes = buildCollectionPatch(base.allMovimentacoes, next.allMovimentacoes);
   const allVendas = buildCollectionPatch(base.allVendas, next.allVendas);
+  const allUtensilios = buildCollectionPatch(base.allUtensilios, next.allUtensilios);
+  const allMovimentacoesUtensilios = buildCollectionPatch(base.allMovimentacoesUtensilios, next.allMovimentacoesUtensilios);
   return {
     ...(statesMatch(base.currentUnit, next.currentUnit) ? {} : { currentUnit: next.currentUnit }),
     ...(statesMatch(base.user, next.user) ? {} : { user: next.user }),
@@ -208,6 +223,8 @@ const buildStatePatch = (base: AppStateSnapshot, next: AppStateSnapshot): StateP
     ...(allFichas ? { allFichas } : {}),
     ...(allMovimentacoes ? { allMovimentacoes } : {}),
     ...(allVendas ? { allVendas } : {}),
+    ...(allUtensilios ? { allUtensilios } : {}),
+    ...(allMovimentacoesUtensilios ? { allMovimentacoesUtensilios } : {}),
   };
 };
 
@@ -221,6 +238,8 @@ const snapshotFromRemote = (state: any): AppStateSnapshot => ({
   allFichas: state.allFichas || [],
   allMovimentacoes: state.allMovimentacoes || [],
   allVendas: state.allVendas || [],
+  allUtensilios: state.allUtensilios || [],
+  allMovimentacoesUtensilios: state.allMovimentacoesUtensilios || [],
 });
 
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -285,6 +304,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     readJsonStorage<VendaLog[]>('chef_all_vendas', initialCollections.allVendas)
   );
 
+  const [allUtensilios, setAllUtensilios] = useState<Utensilio[]>(() =>
+    readJsonStorage<Utensilio[]>('chef_all_utensilios', initialCollections.allUtensilios)
+  );
+
+  const [allMovimentacoesUtensilios, setAllMovimentacoesUtensilios] = useState<MovimentacaoUtensilio[]>(() =>
+    readJsonStorage<MovimentacaoUtensilio[]>('chef_all_movimentacoes_utensilios', initialCollections.allMovimentacoesUtensilios)
+  );
+
   // Persist master states
   useEffect(() => {
     localStorage.setItem('chef_current_unit', currentUnit);
@@ -311,6 +338,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('chef_all_vendas', JSON.stringify(allVendas));
   }, [allVendas]);
 
+  useEffect(() => {
+    localStorage.setItem('chef_all_utensilios', JSON.stringify(allUtensilios));
+  }, [allUtensilios]);
+
+  useEffect(() => {
+    localStorage.setItem('chef_all_movimentacoes_utensilios', JSON.stringify(allMovimentacoesUtensilios));
+  }, [allMovimentacoesUtensilios]);
+
 
   const buildSnapshot = (): AppStateSnapshot => ({
     currentUnit,
@@ -319,7 +354,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     allInsumos: dedupeInsumosById(allInsumos),
     allFichas,
     allMovimentacoes,
-    allVendas
+    allVendas,
+    allUtensilios,
+    allMovimentacoesUtensilios
   });
 
 useEffect(() => {
@@ -340,6 +377,8 @@ useEffect(() => {
         if (Array.isArray(data.allFichas)) setAllFichas(data.allFichas);
         if (Array.isArray(data.allMovimentacoes)) setAllMovimentacoes(data.allMovimentacoes);
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
+        if (Array.isArray(data.allUtensilios)) setAllUtensilios(data.allUtensilios);
+        if (Array.isArray(data.allMovimentacoesUtensilios)) setAllMovimentacoesUtensilios(data.allMovimentacoesUtensilios);
         remoteBaseStateRef.current = snapshotFromRemote(data);
         remoteStateReadyRef.current = true;
       })
@@ -354,7 +393,7 @@ useEffect(() => {
 
   useEffect(() => {
     latestSnapshotRef.current = buildSnapshot();
-  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas]);
+  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios]);
 
   useEffect(() => {
     if (!remoteStateReadyRef.current) return;
@@ -402,13 +441,15 @@ useEffect(() => {
     }, 100);
 
     return () => window.clearTimeout(timer);
-  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas]);
+  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios]);
 
   // Derived filtered state for current unit
   const insumos = allInsumos.filter(i => i.unidade === currentUnit);
   const fichas = allFichas.filter(f => f.unidade === currentUnit);
   const movimentacoes = allMovimentacoes.filter(m => m.unidade === currentUnit);
   const vendas = allVendas.filter(v => v.unidade === currentUnit);
+  const utensilios = allUtensilios.filter(u => u.unidade === currentUnit);
+  const movimentacoesUtensilios = allMovimentacoesUtensilios.filter(m => m.unidade === currentUnit);
 
   const setCurrentUnit = (unit: 'AeB Villa Mayor' | 'VM Cumbuco') => {
     setCurrentUnitState(unit);
@@ -607,6 +648,81 @@ useEffect(() => {
 
     setAllInsumos(estoquePrevisto);
     setAllMovimentacoes(prev => prev.filter(m => m.id !== id));
+    return { success: true };
+  };
+
+  const addUtensilio = (utensilioData: Omit<Utensilio, 'id' | 'unidade' | 'perdasAcumuladas' | 'quantidadeContada' | 'dataUltimaContagem'>) => {
+    const newUtensilio: Utensilio = {
+      ...utensilioData,
+      id: `utensilio-${Date.now()}`,
+      perdasAcumuladas: 0,
+      unidade: currentUnit
+    };
+    setAllUtensilios(prev => [...prev, newUtensilio]);
+  };
+
+  const updateUtensilio = (id: string, updatedFields: Partial<Utensilio>) => {
+    setAllUtensilios(prev => prev.map(utensilio => (
+      utensilio.id === id && utensilio.unidade === currentUnit
+        ? { ...utensilio, ...updatedFields, id: utensilio.id, unidade: currentUnit }
+        : utensilio
+    )));
+  };
+
+  const deleteUtensilio = (id: string): boolean => {
+    const exists = allUtensilios.some(utensilio => utensilio.id === id && utensilio.unidade === currentUnit);
+    if (!exists) return false;
+    setAllUtensilios(prev => prev.filter(utensilio => utensilio.id !== id || utensilio.unidade !== currentUnit));
+    setAllMovimentacoesUtensilios(prev => prev.filter(mov => mov.utensilioId !== id || mov.unidade !== currentUnit));
+    return true;
+  };
+
+  const registrarContagemUtensilio = (id: string, quantidade: number, observacao?: string) => {
+    const utensilio = allUtensilios.find(item => item.id === id && item.unidade === currentUnit);
+    const qty = Number(quantidade);
+    if (!utensilio) return { success: false, error: 'Utensilio nao encontrado.' };
+    if (!Number.isFinite(qty) || qty < 0) return { success: false, error: 'Informe uma quantidade valida.' };
+
+    const data = new Date().toISOString();
+    setAllUtensilios(prev => prev.map(item => item.id === id && item.unidade === currentUnit
+      ? { ...item, quantidadeAtual: qty, quantidadeContada: qty, dataUltimaContagem: data, observacao: observacao || item.observacao }
+      : item
+    ));
+    setAllMovimentacoesUtensilios(prev => [{
+      id: `mov-utensilio-${Date.now()}`,
+      utensilioId: id,
+      utensilioNome: utensilio.nome,
+      tipo: 'contagem',
+      quantidade: qty,
+      data,
+      observacao: observacao || 'Contagem fisica',
+      unidade: currentUnit
+    }, ...prev]);
+    return { success: true };
+  };
+
+  const registrarPerdaUtensilio = (id: string, quantidade: number, observacao?: string) => {
+    const utensilio = allUtensilios.find(item => item.id === id && item.unidade === currentUnit);
+    const qty = Number(quantidade);
+    if (!utensilio) return { success: false, error: 'Utensilio nao encontrado.' };
+    if (!Number.isFinite(qty) || qty <= 0) return { success: false, error: 'Informe uma quantidade maior que zero.' };
+    if (qty > utensilio.quantidadeAtual) return { success: false, error: 'A perda nao pode ser maior que a quantidade disponivel.' };
+
+    const data = new Date().toISOString();
+    setAllUtensilios(prev => prev.map(item => item.id === id && item.unidade === currentUnit
+      ? { ...item, quantidadeAtual: item.quantidadeAtual - qty, perdasAcumuladas: item.perdasAcumuladas + qty }
+      : item
+    ));
+    setAllMovimentacoesUtensilios(prev => [{
+      id: `mov-utensilio-${Date.now()}`,
+      utensilioId: id,
+      utensilioNome: utensilio.nome,
+      tipo: 'perda',
+      quantidade: qty,
+      data,
+      observacao: observacao || 'Perda registrada',
+      unidade: currentUnit
+    }, ...prev]);
     return { success: true };
   };
 
@@ -831,6 +947,8 @@ useEffect(() => {
     setAllFichas(fresh.allFichas);
     setAllMovimentacoes(fresh.allMovimentacoes);
     setAllVendas(fresh.allVendas);
+    setAllUtensilios(fresh.allUtensilios);
+    setAllMovimentacoesUtensilios(fresh.allMovimentacoesUtensilios);
 
     localStorage.removeItem('chef_user');
     localStorage.removeItem('chef_registered_users');
@@ -838,6 +956,8 @@ useEffect(() => {
     localStorage.removeItem('chef_all_fichas');
     localStorage.removeItem('chef_all_movimentacoes');
     localStorage.removeItem('chef_all_vendas');
+    localStorage.removeItem('chef_all_utensilios');
+    localStorage.removeItem('chef_all_movimentacoes_utensilios');
   };
 
   const exportarDados = () => JSON.stringify(buildSnapshot(), null, 2);
@@ -872,6 +992,18 @@ useEffect(() => {
       } else if (Array.isArray(data.vendas)) {
         setAllVendas(prev => [...prev.filter(v => v.unidade !== currentUnit), ...data.vendas.map((v: VendaLog) => ({ ...v, unidade: currentUnit }))]);
       }
+
+      if (Array.isArray(data.allUtensilios)) {
+        setAllUtensilios(data.allUtensilios);
+      } else if (Array.isArray(data.utensilios)) {
+        setAllUtensilios(prev => [...prev.filter(item => item.unidade !== currentUnit), ...data.utensilios.map((item: Utensilio) => ({ ...item, unidade: currentUnit }))]);
+      }
+
+      if (Array.isArray(data.allMovimentacoesUtensilios)) {
+        setAllMovimentacoesUtensilios(data.allMovimentacoesUtensilios);
+      } else if (Array.isArray(data.movimentacoesUtensilios)) {
+        setAllMovimentacoesUtensilios(prev => [...prev.filter(item => item.unidade !== currentUnit), ...data.movimentacoesUtensilios.map((item: MovimentacaoUtensilio) => ({ ...item, unidade: currentUnit }))]);
+      }
       return true;
     } catch (e) {
       console.error(e);
@@ -888,7 +1020,14 @@ useEffect(() => {
       fichas,
       movimentacoes,
       vendas,
+      utensilios,
+      movimentacoesUtensilios,
       updateUser,
+      addUtensilio,
+      updateUtensilio,
+      deleteUtensilio,
+      registrarContagemUtensilio,
+      registrarPerdaUtensilio,
       addInsumo,
       updateInsumo,
       deleteInsumo,

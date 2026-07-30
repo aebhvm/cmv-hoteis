@@ -37,6 +37,8 @@ const initialState = {
   allFichas: [],
   allMovimentacoes: [],
   allVendas: [],
+  allUtensilios: [],
+  allMovimentacoesUtensilios: [],
 };
 
 const getSql = () => {
@@ -78,7 +80,7 @@ const normalizeState = (state: any) => {
   };
 };
 
-const collectionKeys = ['users', 'allInsumos', 'allFichas', 'allMovimentacoes', 'allVendas'] as const;
+const collectionKeys = ['users', 'allInsumos', 'allFichas', 'allMovimentacoes', 'allVendas', 'allUtensilios', 'allMovimentacoesUtensilios'] as const;
 
 const isPlainObject = (value: unknown): value is Record<string, any> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
