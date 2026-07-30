@@ -52,7 +52,7 @@ export const Insumos: React.FC = () => {
   const [quickObs, setQuickObs] = useState('');
 
   // Categorias disponíveis
-  const categorias = ['Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens'];
+  const categorias = ['Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Picolé'];
 
   const resetForm = () => {
     setEditingId(null);
