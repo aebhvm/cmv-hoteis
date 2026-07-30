@@ -60,7 +60,7 @@ function AppContent() {
 
   const tabs = useMemo(() => {
     if (user.cargo !== 'Colaborador') return allTabs;
-    const colaboradorTabs = ['movimentacoes', 'inventario', 'utensilios', 'vendas'];
+    const colaboradorTabs = ['movimentacoes', 'inventario', 'utensilios'];
     return allTabs.filter(tab => colaboradorTabs.includes(tab.id));
   }, [user.cargo]);
 
@@ -160,10 +160,11 @@ function AppContent() {
           <div className="relative">
             <select
               value={currentUnit}
+              disabled={user.cargo === 'Colaborador'}
               onChange={(e) => {
                 setCurrentUnit(e.target.value as 'AeB Villa Mayor' | 'VM Cumbuco');
               }}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 cursor-pointer appearance-none pr-8 shadow-sm transition-all"
+              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 cursor-pointer appearance-none pr-8 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-70"
             >
               <option value="AeB Villa Mayor">🏨 AeB Villa Mayor</option>
               <option value="VM Cumbuco">🏖️ VM Cumbuco</option>
@@ -227,22 +228,21 @@ function AppContent() {
               </button>
             );
           })}
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <button
+              onClick={() => {
+                if (window.confirm('Deseja realmente sair da sessao gerencial?')) {
+                  handleLogout();
+                }
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair do Sistema
+            </button>
+          </div>
         </nav>
 
-        {/* Rodapé da Sidebar - Log Out */}
-        <div className={`p-4 border-t border-slate-100 md:block ${isMobileMenuOpen ? 'block' : 'hidden md:block'}`}>
-          <button
-            onClick={() => {
-              if (window.confirm('Deseja realmente sair da sessão gerencial?')) {
-                handleLogout();
-              }
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-xs font-semibold rounded-xl transition-all cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            Sair do Sistema
-          </button>
-        </div>
       </aside>
 
       {/* 2. Área Principal de Conteúdo */}

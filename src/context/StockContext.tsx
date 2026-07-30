@@ -315,8 +315,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Persist master states
   useEffect(() => {
     localStorage.setItem('chef_current_unit', currentUnit);
-    setUser(prev => ({ ...prev, estabelecimento: currentUnit }));
   }, [currentUnit]);
+
+  useEffect(() => {
+    if (user.cargo !== 'Colaborador') return;
+    const assignedUnit: Unidade = user.estabelecimento === 'VM Cumbuco' ? 'VM Cumbuco' : 'AeB Villa Mayor';
+    if (currentUnit !== assignedUnit) setCurrentUnitState(assignedUnit);
+  }, [user.cargo, user.estabelecimento, currentUnit]);
 
   useEffect(() => {
     localStorage.setItem('chef_user', JSON.stringify(user));
@@ -370,8 +375,9 @@ useEffect(() => {
       .then(data => {
         if (!active) return;
         remoteRevisionRef.current = data._revision || null;
-        if (data.currentUnit) setCurrentUnitState(data.currentUnit);
-        if (data.user) setUser(data.user);
+        const hasActiveSession = sessionStorage.getItem('chef_is_logged_in') === 'true';
+        if (!hasActiveSession && data.currentUnit) setCurrentUnitState(data.currentUnit);
+        if (!hasActiveSession && data.user) setUser(data.user);
         if (Array.isArray(data.users)) setUsers(data.users);
         if (Array.isArray(data.allInsumos)) setAllInsumos(dedupeInsumosById(data.allInsumos));
         if (Array.isArray(data.allFichas)) setAllFichas(data.allFichas);

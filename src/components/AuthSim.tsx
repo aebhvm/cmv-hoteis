@@ -7,7 +7,7 @@ interface AuthSimProps {
 }
 
 export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
-  const { users, registerUser, updateUser } = useStock();
+  const { users, registerUser, updateUser, setCurrentUnit } = useStock();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -64,6 +64,7 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
     );
 
     if (foundUser) {
+      setCurrentUnit(foundUser.estabelecimento as 'AeB Villa Mayor' | 'VM Cumbuco');
       updateUser(foundUser);
       onLoginSuccess();
     } else {
