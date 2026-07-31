@@ -564,13 +564,17 @@ export const Insumos: React.FC = () => {
                   const estoqueCrítico = ins.estoqueAtual < ins.estoqueMinimo;
                   const valorEstoque = roundMoneyUp(ins.estoqueAtual * getEffectiveUnitCost(ins));
                   return (
-                    <tr key={ins.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={ins.id}
+                      onClick={() => { if (!isColaborador) handleOpenEdit(ins); }}
+                      className={`hover:bg-slate-50/70 transition-colors ${!isColaborador ? 'cursor-pointer focus-within:bg-brand-navy/[0.03]' : ''}`}
+                    >
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <div>
                             <button
                               type="button"
-                              onClick={() => handleOpenEdit(ins)}
+                              onClick={(event) => { event.stopPropagation(); handleOpenEdit(ins); }}
                               disabled={isColaborador}
                               className="font-bold text-slate-800 text-sm block text-left hover:text-brand-navy disabled:cursor-default disabled:hover:text-slate-800"
                               title={isColaborador ? undefined : 'Abrir cadastro do insumo'}
@@ -611,7 +615,7 @@ export const Insumos: React.FC = () => {
                           {/* Entrada Rapida - Somente Gestor */}
                           {!isColaborador && (
                             <button
-                              onClick={() => { setQuickAddId(ins.id); setQuickQty(''); }}
+                              onClick={(event) => { event.stopPropagation(); setQuickAddId(ins.id); setQuickQty(''); }}
                               className="p-1.5 bg-slate-50 hover:bg-brand-navy/5 text-brand-navy rounded-lg border border-slate-200 transition-all cursor-pointer"
                               title="Entrada Rapida de Compra"
                             >
@@ -632,7 +636,7 @@ export const Insumos: React.FC = () => {
                           {/* Deletar - Somente Gestor */}
                           {!isColaborador && (
                             <button
-                              onClick={() => handleDelete(ins.id)}
+                              onClick={(event) => { event.stopPropagation(); handleDelete(ins.id); }}
                               className="p-1.5 bg-slate-50 hover:bg-rose-50 text-rose-600 rounded-lg border border-slate-200 transition-all cursor-pointer"
                               title="Excluir Insumo"
                             >
