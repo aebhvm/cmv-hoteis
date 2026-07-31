@@ -81,7 +81,7 @@ export interface MovimentacaoUtensilio {
   id: string;
   utensilioId: string;
   utensilioNome: string;
-  tipo: 'contagem' | 'perda';
+  tipo: 'contagem' | 'perda' | 'entrada';
   quantidade: number;
   data: string;
   observacao?: string;

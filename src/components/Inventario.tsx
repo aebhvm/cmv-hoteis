@@ -29,7 +29,7 @@ export const Inventario: React.FC = () => {
   // Estado de feedback de gravação individual
   const [feedbackSalvos, setFeedbackSalvos] = useState<{ [id: string]: 'salvo' | null }>({});
 
-  const categorias = ['Todas', 'Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Picolé'];
+  const categorias = ['Todas', 'Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Café da manhã', 'Picolé'];
 
   // Valor total teórico do estoque
   const totalValorTeorico = insumos.reduce((acc, ins) => acc + (ins.estoqueAtual * ins.custoMedio), 0);

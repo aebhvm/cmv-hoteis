@@ -66,13 +66,17 @@ export const Utensilios: React.FC = () => {
     updateUtensilio,
     deleteUtensilio,
     registrarContagemUtensilio,
-    registrarPerdaUtensilio
+    registrarPerdaUtensilio,
+    registrarEntradaUtensilio
   } = useStock();
   const isGestor = user.cargo !== 'Colaborador';
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todas');
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editando, setEditando] = useState<Utensilio | null>(null);
+  const [adicionarItem, setAdicionarItem] = useState<Utensilio | null>(null);
+  const [adicionarQuantidade, setAdicionarQuantidade] = useState('');
+  const [adicionarObservacao, setAdicionarObservacao] = useState('');
   const [contagemId, setContagemId] = useState('');
   const [contagem, setContagem] = useState('');
   const [contagemObservacao, setContagemObservacao] = useState('');
@@ -137,7 +141,7 @@ export const Utensilios: React.FC = () => {
     const historicoRows = historicoFiltrado.map(mov => ({
       data: mov.data,
       utensilioNome: mov.utensilioNome,
-      tipo: mov.tipo === 'perda' ? 'Perda' : 'Contagem',
+      tipo: mov.tipo === 'perda' ? 'Perda' : mov.tipo === 'entrada' ? 'Entrada' : 'Contagem',
       quantidade: mov.quantidade,
       observacao: mov.observacao || '',
       unidade: currentUnit
@@ -197,6 +201,24 @@ export const Utensilios: React.FC = () => {
     setContagem('');
     setContagemObservacao('');
     notify('Contagem registrada.');
+  };
+
+  const closeAdicao = () => {
+    setAdicionarItem(null);
+    setAdicionarQuantidade('');
+    setAdicionarObservacao('');
+  };
+
+  const submitAdicao = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!adicionarItem) return;
+    const result = registrarEntradaUtensilio(adicionarItem.id, Number(adicionarQuantidade), adicionarObservacao.trim());
+    if (!result.success) {
+      notify(result.error || 'Nao foi possivel adicionar o estoque.');
+      return;
+    }
+    closeAdicao();
+    notify('Entrada de utensilios registrada.');
   };
 
   const submitPerda = (event: React.FormEvent) => {
@@ -373,7 +395,7 @@ export const Utensilios: React.FC = () => {
                     <td className="px-4 py-3 text-right font-mono text-slate-600">{item.quantidadeContada === undefined ? '-' : formatNumber(item.quantidadeContada)}<span className="block text-[10px] text-slate-400">{formatDate(item.dataUltimaContagem)}</span></td>
                     <td className="px-4 py-3 text-right font-mono text-rose-700">{formatNumber(item.perdasAcumuladas)}</td>
                     <td className="px-4 py-3 text-right font-mono text-slate-500">{formatNumber(item.estoqueMinimo)}</td>
-                    {isGestor && <td className="px-4 py-3"><div className="flex justify-end gap-1"><button type="button" onClick={() => setEditando(item)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-brand-navy" title="Editar utensílio" aria-label={`Editar ${item.nome}`}><Edit3 className="h-4 w-4" /></button><button type="button" onClick={() => remove(item)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="Excluir utensílio" aria-label={`Excluir ${item.nome}`}><Trash2 className="h-4 w-4" /></button></div></td>}
+                    {isGestor && <td className="px-4 py-3"><div className="flex justify-end gap-1"><button type="button" onClick={() => { setAdicionarItem(item); setAdicionarQuantidade(''); setAdicionarObservacao(''); }} className="rounded-lg p-2 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700" title="Adicionar estoque" aria-label={`Adicionar estoque de ${item.nome}`}><Plus className="h-4 w-4" /></button><button type="button" onClick={() => setEditando(item)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-brand-navy" title="Editar utensílio" aria-label={`Editar ${item.nome}`}><Edit3 className="h-4 w-4" /></button><button type="button" onClick={() => remove(item)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="Excluir utensílio" aria-label={`Excluir ${item.nome}`}><Trash2 className="h-4 w-4" /></button></div></td>}
                   </tr>
                 );
               })}
@@ -405,12 +427,38 @@ export const Utensilios: React.FC = () => {
               <tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Utensílio</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3 text-right">Quantidade</th><th className="px-4 py-3">Observação</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
-              {historicoFiltrado.map(mov => <tr key={mov.id}><td className="px-4 py-3 text-slate-500">{formatDate(mov.data)}</td><td className="px-4 py-3 font-semibold text-slate-800">{mov.utensilioNome}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${mov.tipo === 'perda' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>{mov.tipo === 'perda' ? 'Perda' : 'Contagem'}</span></td><td className="px-4 py-3 text-right font-mono">{formatNumber(mov.quantidade)}</td><td className="px-4 py-3 text-slate-500">{mov.observacao || '-'}</td></tr>)}
+              {historicoFiltrado.map(mov => <tr key={mov.id}><td className="px-4 py-3 text-slate-500">{formatDate(mov.data)}</td><td className="px-4 py-3 font-semibold text-slate-800">{mov.utensilioNome}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${mov.tipo === 'perda' ? 'bg-rose-50 text-rose-700' : mov.tipo === 'entrada' ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}`}>{mov.tipo === 'perda' ? 'Perda' : mov.tipo === 'entrada' ? 'Entrada' : 'Contagem'}</span></td><td className="px-4 py-3 text-right font-mono">{formatNumber(mov.quantidade)}</td><td className="px-4 py-3 text-slate-500">{mov.observacao || '-'}</td></tr>)}
             </tbody>
           </table>
           {!historicoFiltrado.length && <div className="p-8 text-center text-xs text-slate-500">Nenhuma movimentação de utensílio registrada.</div>}
         </div>
       </section>
+
+      {adicionarItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="adicionar-utensilio-title">
+          <form onSubmit={submitAdicao} className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 id="adicionar-utensilio-title" className="text-sm font-bold text-slate-800">Adicionar estoque</h3>
+                <p className="mt-1 text-xs text-slate-500">{adicionarItem.nome} · Atual: {formatNumber(adicionarItem.quantidadeAtual)} {adicionarItem.unidadeMedida}</p>
+              </div>
+              <button type="button" onClick={closeAdicao} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar adicao"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-slate-600">Quantidade comprada
+                <input required min="0.01" step="any" type="number" value={adicionarQuantidade} onChange={e => setAdicionarQuantidade(e.target.value)} placeholder="Ex.: 10" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+              </label>
+              <label className="block text-xs font-semibold text-slate-600">Observacao (opcional)
+                <input value={adicionarObservacao} onChange={e => setAdicionarObservacao(e.target.value)} placeholder="Ex.: Compra NF 123" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+              </label>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={closeAdicao} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" className="flex items-center gap-2 rounded-lg bg-brand-navy px-4 py-2 text-xs font-bold text-white hover:bg-brand-navy/90"><Plus className="h-4 w-4" /> Adicionar</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
 
       {editando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="editar-utensilio-title">

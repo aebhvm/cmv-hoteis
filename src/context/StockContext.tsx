@@ -24,6 +24,7 @@ interface StockContextType {
   deleteUtensilio: (id: string) => boolean;
   registrarContagemUtensilio: (id: string, quantidade: number, observacao?: string) => { success: boolean; error?: string };
   registrarPerdaUtensilio: (id: string, quantidade: number, observacao?: string) => { success: boolean; error?: string };
+  registrarEntradaUtensilio: (id: string, quantidade: number, observacao?: string) => { success: boolean; error?: string };
   addInsumo: (insumo: Omit<Insumo, 'id'>) => void;
   updateInsumo: (id: string, insumo: Partial<Insumo>) => void;
   deleteInsumo: (id: string) => boolean;
@@ -757,6 +758,30 @@ useEffect(() => {
     return { success: true };
   };
 
+  const registrarEntradaUtensilio = (id: string, quantidade: number, observacao?: string) => {
+    const utensilio = allUtensilios.find(item => item.id === id && item.unidade === currentUnit);
+    const qty = Number(quantidade);
+    if (!utensilio) return { success: false, error: 'Utensilio nao encontrado.' };
+    if (!Number.isFinite(qty) || qty <= 0) return { success: false, error: 'Informe uma quantidade maior que zero.' };
+
+    const data = new Date().toISOString();
+    setAllUtensilios(prev => prev.map(item => item.id === id && item.unidade === currentUnit
+      ? { ...item, quantidadeAtual: item.quantidadeAtual + qty }
+      : item
+    ));
+    setAllMovimentacoesUtensilios(prev => [{
+      id: `mov-utensilio-${Date.now()}`,
+      utensilioId: id,
+      utensilioNome: utensilio.nome,
+      tipo: 'entrada',
+      quantidade: qty,
+      data,
+      observacao: observacao || 'Entrada de compra',
+      unidade: currentUnit
+    }, ...prev]);
+    return { success: true };
+  };
+
   const addFicha = (fichaData: Omit<FichaTecnica, 'id'>) => {
     const newFicha: FichaTecnica = {
       ...fichaData,
@@ -1059,6 +1084,7 @@ useEffect(() => {
       deleteUtensilio,
       registrarContagemUtensilio,
       registrarPerdaUtensilio,
+      registrarEntradaUtensilio,
       addInsumo,
       updateInsumo,
       deleteInsumo,
