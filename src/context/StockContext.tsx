@@ -690,12 +690,10 @@ useEffect(() => {
     if (!Number.isFinite(qty) || qty < 0) return { success: false, error: 'Informe uma quantidade valida.' };
 
     const data = new Date().toISOString();
-    setAllUtensilios(prev => prev.map(item => item.id === id && item.unidade === currentUnit
-      ? { ...item, quantidadeAtual: qty, quantidadeContada: qty, dataUltimaContagem: data, observacao: observacao || item.observacao }
-      : item
-    ));
-    setAllMovimentacoesUtensilios(prev => [{
-      id: `mov-utensilio-${Date.now()}`,
+    const diferencaPerda = Math.max(0, utensilio.quantidadeAtual - qty);
+    const timestamp = Date.now();
+    const movimentoContagem: MovimentacaoUtensilio = {
+      id: `mov-utensilio-${timestamp}`,
       utensilioId: id,
       utensilioNome: utensilio.nome,
       tipo: 'contagem',
@@ -703,7 +701,34 @@ useEffect(() => {
       data,
       observacao: observacao || 'Contagem fisica',
       unidade: currentUnit
-    }, ...prev]);
+    };
+    const movimentoPerda: MovimentacaoUtensilio | null = diferencaPerda > 0 ? {
+      id: `mov-utensilio-${timestamp}-perda`,
+      utensilioId: id,
+      utensilioNome: utensilio.nome,
+      tipo: 'perda',
+      quantidade: diferencaPerda,
+      data,
+      observacao: observacao ? `Perda identificada na contagem fisica - ${observacao}` : 'Perda identificada na contagem fisica',
+      unidade: currentUnit
+    } : null;
+
+    setAllUtensilios(prev => prev.map(item => item.id === id && item.unidade === currentUnit
+      ? {
+        ...item,
+        quantidadeAtual: qty,
+        quantidadeContada: qty,
+        perdasAcumuladas: item.perdasAcumuladas + diferencaPerda,
+        dataUltimaContagem: data,
+        observacao: observacao || item.observacao
+      }
+      : item
+    ));
+    setAllMovimentacoesUtensilios(prev => [
+      movimentoContagem,
+      ...(movimentoPerda ? [movimentoPerda] : []),
+      ...prev
+    ]);
     return { success: true };
   };
 
