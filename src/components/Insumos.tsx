@@ -568,7 +568,15 @@ export const Insumos: React.FC = () => {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <div>
-                            <span className="font-bold text-slate-800 text-sm block">{ins.nome}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(ins)}
+                              disabled={isColaborador}
+                              className="font-bold text-slate-800 text-sm block text-left hover:text-brand-navy disabled:cursor-default disabled:hover:text-slate-800"
+                              title={isColaborador ? undefined : 'Abrir cadastro do insumo'}
+                            >
+                              {ins.nome}
+                            </button>
                             <span className="text-[10px] text-slate-400 font-mono">ID: {ins.id}</span>
                           </div>
                           {estoqueCrítico && (
