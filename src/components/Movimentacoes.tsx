@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { Insumo, Movimentacao, SetorEstoque } from '../types';
 import { 
@@ -67,6 +67,9 @@ export const Movimentacoes: React.FC = () => {
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const firstMovementFieldRef = useRef<HTMLSelectElement>(null);
+  const productSearchRef = useRef<HTMLInputElement>(null);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const normalizeSearch = (value: string) =>
     value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -107,6 +110,7 @@ export const Movimentacoes: React.FC = () => {
     setInsumoSearchTerm(ins.nome);
     setSetorMovimentacao(getInsumoSetor(ins));
     setCustoUnitario(ins.custoMedio.toString());
+    setSuggestionIndex(-1);
     setShowInsumoSugestoes(false);
   };
 
@@ -168,6 +172,7 @@ export const Movimentacoes: React.FC = () => {
     setErrorMsg('');
     setDataMovimentacao(toLocalDateKey(new Date()));
     setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');
+    window.requestAnimationFrame(() => firstMovementFieldRef.current?.focus());
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
@@ -405,6 +410,7 @@ export const Movimentacoes: React.FC = () => {
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tipo de Lançamento *</label>
               <select
+                ref={firstMovementFieldRef}
                 value={tipo}
                 onChange={(e) => {
                   setTipo(e.target.value as any);
@@ -435,6 +441,7 @@ export const Movimentacoes: React.FC = () => {
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
+                  ref={productSearchRef}
                   id="mov-produto-search"
                   type="text"
                   role="combobox"
@@ -446,9 +453,27 @@ export const Movimentacoes: React.FC = () => {
                     setInsumoSearchTerm(e.target.value);
                     setInsumoId('');
                     setCustoUnitario('');
+                    setSuggestionIndex(-1);
                     setShowInsumoSugestoes(true);
                   }}
                   onFocus={() => setShowInsumoSugestoes(true)}
+                  onKeyDown={(e) => {
+                    if (!insumoSearchTerm.trim() || insumoSugestoes.length === 0) return;
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setShowInsumoSugestoes(true);
+                      setSuggestionIndex(current => {
+                        const nextIndex = e.key === 'ArrowDown' ? current + 1 : current - 1;
+                        return Math.max(0, Math.min(nextIndex, insumoSugestoes.length - 1));
+                      });
+                    } else if (e.key === 'Enter' && suggestionIndex >= 0) {
+                      e.preventDefault();
+                      handleSelectInsumo(insumoSugestoes[suggestionIndex].id);
+                    } else if (e.key === 'Escape') {
+                      setShowInsumoSugestoes(false);
+                      setSuggestionIndex(-1);
+                    }
+                  }}
                   onBlur={() => window.setTimeout(() => setShowInsumoSugestoes(false), 120)}
                   className="w-full pl-9 pr-10 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                   placeholder="Digite o nome do produto..."
@@ -475,15 +500,16 @@ export const Movimentacoes: React.FC = () => {
                 {showInsumoSugestoes && insumoSearchTerm.trim() && (
                   <div id="mov-insumo-sugestoes" role="listbox" className="absolute z-40 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl divide-y divide-slate-100">
                     {insumoSugestoes.length > 0 ? (
-                      insumoSugestoes.map(ins => (
+                      insumoSugestoes.map((ins, index) => (
                         <button
                           key={ins.id}
                           type="button"
                           role="option"
                           aria-selected={ins.id === insumoId}
+                          onMouseEnter={() => setSuggestionIndex(index)}
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleSelectInsumo(ins.id)}
-                          className="w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                          className={`w-full px-3 py-2 text-left transition-colors cursor-pointer ${suggestionIndex === index ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
                         >
                           <span className="block text-xs font-bold text-slate-800 break-words">{ins.nome}</span>
                           <span className="block text-[10px] text-slate-500 font-mono">
