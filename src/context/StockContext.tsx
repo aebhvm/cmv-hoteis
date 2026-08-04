@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile, Utensilio, MovimentacaoUtensilio } from '../types';
+import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile, Utensilio, MovimentacaoUtensilio, SetorEstoque } from '../types';
 import {
   INITIAL_USER,
   INITIAL_INSUMOS,
@@ -70,6 +70,14 @@ export const useStock = () => {
 
 
 type Unidade = 'AeB Villa Mayor' | 'VM Cumbuco';
+
+const SETOR_CAFE: SetorEstoque = 'Café da manhã';
+const SETOR_RESTAURANTE: SetorEstoque = 'Restaurante';
+
+const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
+  if (insumo.setor === SETOR_CAFE || insumo.setor === SETOR_RESTAURANTE) return insumo.setor;
+  return insumo.categoria === SETOR_CAFE ? SETOR_CAFE : SETOR_RESTAURANTE;
+};
 
 type AppStateSnapshot = {
   currentUnit: Unidade;
@@ -487,6 +495,7 @@ useEffect(() => {
         custoTotal: custoTot,
         data: new Date().toISOString(),
         observacao: 'Saldo Inicial de Cadastro',
+        setor: getInsumoSetor(newInsumo),
         unidade: currentUnit
       };
       setAllMovimentacoes(prev => [newMov, ...prev]);
@@ -580,6 +589,7 @@ useEffect(() => {
       custoTotal: totalCost,
       data: movData.data || new Date().toISOString(),
       observacao: movData.observacao || '',
+      setor: getInsumoSetor(insumo),
       unidade: currentUnit
     };
 
@@ -615,7 +625,8 @@ useEffect(() => {
       custoUnitario: costUnit,
       custoTotal: Number((qty * costUnit).toFixed(2)),
       data: movData.data || original.data,
-      observacao: movData.observacao || ''
+      observacao: movData.observacao || '',
+      setor: getInsumoSetor(insumoNovo)
     };
 
     const estoquePrevisto = allInsumos.map(ins => {
@@ -856,6 +867,7 @@ useEffect(() => {
           custoTotal: Number(getInsumoQuantityCost(ins, quantConsumida).toFixed(2)),
           data: new Date().toISOString(),
           observacao: `Consumo venda: ${qty}x ${f.nome} [venda:${saleId}]`,
+          setor: getInsumoSetor(ins),
           unidade: currentUnit
         };
         newMovs.push(novaMov);
@@ -913,6 +925,7 @@ useEffect(() => {
         custoTotal: Number(getInsumoQuantityCost(ins, quantConsumida).toFixed(2)),
         data: new Date().toISOString(),
         observacao: `Consumo venda: ${qty}x ${f.nome} [venda:${saleId}]`,
+        setor: getInsumoSetor(ins),
         unidade: currentUnit
       });
     });

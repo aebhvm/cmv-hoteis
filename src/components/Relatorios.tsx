@@ -24,7 +24,7 @@ type SpreadsheetCell = string | number | boolean | Date | null;
 const INSUMO_HEADERS = ['id', 'nome', 'categoria', 'setor', 'unidadeMedida', 'custoMedio', 'valorEmbalagem', 'conteudoEmbalagem', 'estoqueAtual', 'estoqueMinimo', 'fornecedor', 'validade', 'unidade'];
 const FICHA_HEADERS = ['id', 'nome', 'categoria', 'precoVenda', 'rendimentoPorcoes', 'descricao', 'unidade'];
 const INGREDIENTE_HEADERS = ['fichaId', 'insumoId', 'quantidade'];
-const MOVIMENTACAO_HEADERS = ['id', 'insumoId', 'insumoNome', 'tipo', 'quantidade', 'custoUnitario', 'custoTotal', 'data', 'observacao', 'unidade'];
+const MOVIMENTACAO_HEADERS = ['id', 'insumoId', 'insumoNome', 'tipo', 'quantidade', 'custoUnitario', 'custoTotal', 'data', 'observacao', 'setor', 'unidade'];
 const VENDA_HEADERS = ['id', 'fichaId', 'fichaNome', 'quantidade', 'precoVendaUnitario', 'receitaTotal', 'custoInsumosTotal', 'data', 'unidade'];
 const USUARIO_HEADERS = ['id', 'nome', 'email', 'cargo', 'estabelecimento', 'metaFCP', 'senha'];
 
@@ -116,6 +116,7 @@ const parseExcelBackup = async (file: File) => {
       id: toString(row.id), insumoId: toString(row.insumoId), insumoNome: toString(row.insumoNome),
       tipo: toString(row.tipo), quantidade: toNumber(row.quantidade), custoUnitario: toOptionalNumber(row.custoUnitario),
       custoTotal: toNumber(row.custoTotal), data: toString(row.data), observacao: toString(row.observacao) || undefined,
+      setor: toString(row.setor) || undefined,
       unidade: toString(row.unidade) || undefined
     })),
     allVendas: readSheetRows(sheets, 'Vendas').map(row => ({

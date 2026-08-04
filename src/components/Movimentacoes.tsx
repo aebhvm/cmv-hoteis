@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { Insumo, Movimentacao, SetorEstoque } from '../types';
 import { 
   Plus, 
   Search, 
@@ -32,6 +33,14 @@ const toMovementIso = (dateKey: string, previousDate?: string) => {
   return base.toISOString();
 };
 
+const SETOR_CAFE: SetorEstoque = 'Café da manhã';
+const SETOR_RESTAURANTE: SetorEstoque = 'Restaurante';
+const SETOR_TABS = ['Todos', SETOR_CAFE, SETOR_RESTAURANTE] as const;
+
+const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
+  if (insumo.setor === SETOR_CAFE || insumo.setor === SETOR_RESTAURANTE) return insumo.setor;
+  return insumo.categoria === SETOR_CAFE ? SETOR_CAFE : SETOR_RESTAURANTE;
+};
 export const Movimentacoes: React.FC = () => {
   const { user, movimentacoes, insumos, addMovimentacao, updateMovimentacao, deleteMovimentacao } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
@@ -40,6 +49,8 @@ export const Movimentacoes: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'todos' | 'entrada' | 'saida' | 'desperdicio' | 'ajuste'>('todos');
   const [selectedDate, setSelectedDate] = useState('');
+  const [setorAtivo, setSetorAtivo] = useState<'Todos' | SetorEstoque>('Todos');
+  const [setorMovimentacao, setSetorMovimentacao] = useState<SetorEstoque>(SETOR_RESTAURANTE);
 
   // Estados do formulário de lançamento
   const [showForm, setShowForm] = useState(false);
@@ -59,8 +70,31 @@ export const Movimentacoes: React.FC = () => {
   const normalizeSearch = (value: string) =>
     value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+  const setorProdutos = showForm ? setorMovimentacao : setorAtivo;
+  const insumosDoSetor = setorProdutos === 'Todos'
+    ? insumos
+    : insumos.filter(ins => getInsumoSetor(ins) === setorProdutos);
+
+  const getMovimentacaoSetor = (mov: Movimentacao): SetorEstoque => {
+    if (mov.setor === SETOR_CAFE || mov.setor === SETOR_RESTAURANTE) return mov.setor;
+    const insumo = insumos.find(item => item.id === mov.insumoId);
+    return insumo ? getInsumoSetor(insumo) : SETOR_RESTAURANTE;
+  };
+
+  const handleSetorChange = (setor: 'Todos' | SetorEstoque) => {
+    setSetorAtivo(setor);
+    if (setor !== 'Todos') setSetorMovimentacao(setor);
+    const selectedInsumo = insumos.find(item => item.id === insumoId);
+    if (setor !== 'Todos' && selectedInsumo && getInsumoSetor(selectedInsumo) !== setor) {
+      setInsumoId('');
+      setInsumoSearchTerm('');
+      setCustoUnitario('');
+      setShowInsumoSugestoes(false);
+    }
+  };
+
   const insumoSugestoes = insumoSearchTerm.trim()
-    ? [...insumos]
+    ? [...insumosDoSetor]
         .filter(ins => normalizeSearch(ins.nome).includes(normalizeSearch(insumoSearchTerm)))
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
         .slice(0, 8)
@@ -71,6 +105,7 @@ export const Movimentacoes: React.FC = () => {
     if (!ins) return;
     setInsumoId(ins.id);
     setInsumoSearchTerm(ins.nome);
+    setSetorMovimentacao(getInsumoSetor(ins));
     setCustoUnitario(ins.custoMedio.toString());
     setShowInsumoSugestoes(false);
   };
@@ -92,6 +127,11 @@ export const Movimentacoes: React.FC = () => {
       setErrorMsg('Insumo inválido.');
       return;
     }
+    if (getInsumoSetor(ins) !== setorMovimentacao) {
+      setErrorMsg('O produto selecionado pertence a outro setor. Escolha o setor correto.');
+      return;
+    }
+
 
     // Validar se quantidade é suficiente para saídas/desperdícios
     const qty = Number(quantidade);
@@ -124,6 +164,7 @@ export const Movimentacoes: React.FC = () => {
     setCustoUnitario('');
     setObservacao('');
     setEditingMovId(null);
+    setSetorMovimentacao(setorAtivo === 'Todos' ? SETOR_RESTAURANTE : setorAtivo);
     setShowForm(false);
     setErrorMsg('');
     setDataMovimentacao(toLocalDateKey(new Date()));
@@ -156,6 +197,7 @@ export const Movimentacoes: React.FC = () => {
     setEditingMovId(id);
     setInsumoId(mov.insumoId);
     setInsumoSearchTerm(insumos.find(item => item.id === mov.insumoId)?.nome || mov.insumoNome);
+    setSetorMovimentacao(getMovimentacaoSetor(mov));
     setShowInsumoSugestoes(false);
     setTipo(mov.tipo);
     setQuantidade(mov.quantidade.toString());
@@ -195,7 +237,8 @@ export const Movimentacoes: React.FC = () => {
                           (m.observacao && m.observacao.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesType = selectedType === 'todos' || m.tipo === selectedType;
     const matchesDate = !selectedDate || toLocalDateKey(m.data) === selectedDate;
-    return matchesSearch && matchesType && matchesDate;
+    const matchesSector = setorAtivo === 'Todos' || getMovimentacaoSetor(m) === setorAtivo;
+    return matchesSearch && matchesType && matchesDate && matchesSector;
   }).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
   const groupedMovs = filteredMovs.reduce<Array<{ dateKey: string; items: typeof filteredMovs }>>((groups, mov) => {
@@ -206,7 +249,11 @@ export const Movimentacoes: React.FC = () => {
     return groups;
   }, []);
 
-  const movimentosDaData = movimentacoes.filter(m => !selectedDate || toLocalDateKey(m.data) === selectedDate);
+  const movimentosDaData = movimentacoes.filter(m => {
+    const matchesDate = !selectedDate || toLocalDateKey(m.data) === selectedDate;
+    const matchesSector = setorAtivo === 'Todos' || getMovimentacaoSetor(m) === setorAtivo;
+    return matchesDate && matchesSector;
+  });
   const totalEntradasR$ = movimentosDaData
     .filter(m => m.tipo === 'entrada')
     .reduce((acc, m) => acc + m.custoTotal, 0);
@@ -219,6 +266,21 @@ export const Movimentacoes: React.FC = () => {
     : 'Todo o período';
 
   const getTipoEstilo = (tipo: string) => {
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="Setor das movimentações">
+        {SETOR_TABS.map(setor => (
+          <button
+            key={setor}
+            type="button"
+            role="tab"
+            aria-selected={setorAtivo === setor}
+            onClick={() => handleSetorChange(setor)}
+            className={setorAtivo === setor ? 'whitespace-nowrap border-b-2 border-brand-navy px-4 py-2.5 text-xs font-bold text-brand-navy' : 'whitespace-nowrap border-b-2 border-transparent px-4 py-2.5 text-xs font-bold text-slate-400 hover:border-slate-300 hover:text-slate-700'}
+          >
+            {setor}
+          </button>
+        ))}
+      </div>
+
     switch(tipo) {
       case 'entrada': 
         return { text: 'Entrada / Compra', bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' };
@@ -302,6 +364,19 @@ export const Movimentacoes: React.FC = () => {
           <div>
             <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Desperdício - {selectedDateLabel}</span>
             <span className="text-xl font-black text-rose-600 font-mono mt-1">
+            <div>
+              <label htmlFor="setor-movimentacao" className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Setor da movimentação *</label>
+              <select
+                id="setor-movimentacao"
+                value={setorMovimentacao}
+                onChange={(e) => handleSetorChange(e.target.value as SetorEstoque)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
+              >
+                <option value={SETOR_RESTAURANTE}>{SETOR_RESTAURANTE}</option>
+                <option value={SETOR_CAFE}>{SETOR_CAFE}</option>
+              </select>
+            </div>
+
               R$ {totalDesperdicioR$.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
@@ -568,6 +643,7 @@ export const Movimentacoes: React.FC = () => {
               <tr className="bg-slate-50/30 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 <th className="py-3.5 px-4">Data / Hora</th>
                 <th className="py-3.5 px-4">Insumo</th>
+                <th className="py-3.5 px-4">Setor</th>
                 <th className="py-3.5 px-4">Tipo</th>
                 <th className="py-3.5 px-4 text-right">Quantidade</th>
                 <th className="py-3.5 px-4 text-right">Custo Unitário</th>
@@ -579,7 +655,7 @@ export const Movimentacoes: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
               {filteredMovs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-slate-400">
+                  <td colSpan={9} className="py-10 text-center text-slate-400">
                     Nenhuma movimentação registrada para os filtros selecionados.
                   </td>
                 </tr>
@@ -587,7 +663,7 @@ export const Movimentacoes: React.FC = () => {
                 groupedMovs.map(group => (
                   <React.Fragment key={group.dateKey}>
                     <tr className="bg-slate-50/80 border-y border-slate-200">
-                      <td colSpan={8} className="px-4 py-2">
+                      <td colSpan={9} className="px-4 py-2">
                         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                           <Calendar className="w-3.5 h-3.5 text-brand-navy" />
                           {new Date(`${group.dateKey}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
@@ -616,6 +692,7 @@ export const Movimentacoes: React.FC = () => {
                         </div>
                       </td>
                       <td className="py-3.5 px-4 font-bold text-slate-800">{m.insumoNome}</td>
+                      <td className="py-3.5 px-4 text-xs font-semibold text-slate-500">{getMovimentacaoSetor(m)}</td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${estiloBadge.bg}`}>
                           {estiloBadge.text}

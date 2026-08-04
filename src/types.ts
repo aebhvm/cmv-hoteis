@@ -42,6 +42,7 @@ export interface Movimentacao {
   custoTotal: number;
   data: string;
   observacao?: string;
+  setor?: SetorEstoque;
   unidade?: string;
 }
 
