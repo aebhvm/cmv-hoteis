@@ -160,7 +160,6 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
       setSuccessMsg('Insumo cadastrado com sucesso!');
     }
 
-    setShowForm(false);
     resetForm();
     setTimeout(() => setSuccessMsg(''), 3000);
   };

@@ -165,7 +165,6 @@ export const Movimentacoes: React.FC = () => {
     setObservacao('');
     setEditingMovId(null);
     setSetorMovimentacao(setorAtivo === 'Todos' ? SETOR_RESTAURANTE : setorAtivo);
-    setShowForm(false);
     setErrorMsg('');
     setDataMovimentacao(toLocalDateKey(new Date()));
     setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');

@@ -112,7 +112,6 @@ export const Usuarios: React.FC = () => {
 
     const wasEditing = Boolean(editingEmail);
     resetForm();
-    setShowForm(false);
     setSuccessMsg(wasEditing ? 'Usuario atualizado com sucesso!' : 'Usuario cadastrado com sucesso!');
     setTimeout(() => setSuccessMsg(''), 4000);
   };

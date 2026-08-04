@@ -201,7 +201,6 @@ export const FichasTecnicas: React.FC = () => {
       setSuccessMsg('Nova Ficha técnica criada com sucesso!');
     }
 
-    setShowForm(false);
     resetForm();
     setTimeout(() => setSuccessMsg(''), 3000);
   };
