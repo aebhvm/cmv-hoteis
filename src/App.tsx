@@ -18,6 +18,7 @@ import {
   ArrowUpDown, 
   ClipboardCheck, 
   Utensils,
+  Coffee,
   ShoppingCart, 
   BarChart4, 
   LogOut, 
@@ -50,6 +51,8 @@ function AppContent() {
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'utensilios', label: 'Utensilios', icon: Utensils },
     { id: 'insumos', label: 'Insumos', icon: Boxes },
+    { id: 'insumos-cafe', label: 'Café da manhã', icon: Coffee },
+    { id: 'insumos-restaurante', label: 'Restaurante', icon: Utensils },
     { id: 'fichas', label: 'Fichas Técnicas', icon: BookOpen },
     { id: 'movimentacoes', label: 'Movimentações', icon: ArrowUpDown },
     { id: 'inventario', label: 'Inventário / Auditoria', icon: ClipboardCheck },
@@ -94,6 +97,10 @@ function AppContent() {
       case 'insumos':
         if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <Insumos />;
+      case 'insumos-cafe':
+        return <Insumos setorInicial="Café da manhã" />;
+      case 'insumos-restaurante':
+        return <Insumos setorInicial="Restaurante" />;
       case 'fichas':
         if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <FichasTecnicas />;

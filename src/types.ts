@@ -1,7 +1,10 @@
+export type SetorEstoque = 'Café da manhã' | 'Restaurante';
+
 export interface Insumo {
   id: string;
   nome: string;
   categoria: string;
+  setor?: SetorEstoque;
   unidadeMedida: 'kg' | 'g' | 'L' | 'ml' | 'un';
   custoMedio: number; // Custo médio por unidade de medida (ex: R$ por kg)
   valorEmbalagem?: number; // Valor pago pela embalagem completa

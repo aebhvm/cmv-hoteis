@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStock } from '../context/StockContext';
-import { Insumo } from '../types';
+import { Insumo, SetorEstoque } from '../types';
 import { 
   Plus, 
   Search, 
@@ -18,14 +18,34 @@ import {
   Coins
 } from 'lucide-react';
 
-export const Insumos: React.FC = () => {
+const SETOR_CAFE: SetorEstoque = 'Café da manhã';
+const SETOR_RESTAURANTE: SetorEstoque = 'Restaurante';
+const SETOR_TABS = ['Todos', SETOR_CAFE, SETOR_RESTAURANTE] as const;
+
+const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
+  if (insumo.setor === SETOR_CAFE || insumo.setor === SETOR_RESTAURANTE) return insumo.setor;
+  return insumo.categoria === SETOR_CAFE ? SETOR_CAFE : SETOR_RESTAURANTE;
+};
+
+interface InsumosProps {
+  setorInicial?: SetorEstoque;
+}
+
+export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
   const { user, insumos, addInsumo, updateInsumo, deleteInsumo, fichas, addMovimentacao } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
   
   // Estados para busca e filtragem
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
+  const [setorAtivo, setSetorAtivo] = useState<'Todos' | SetorEstoque>(setorInicial || 'Todos');
+  const [setor, setSetor] = useState<SetorEstoque>(SETOR_RESTAURANTE);
   const [filterAlerts, setFilterAlerts] = useState(false);
+
+  useEffect(() => {
+    setSetorAtivo(setorInicial || 'Todos');
+    setSelectedCategory('Todas');
+  }, [setorInicial]);
 
   // Estados do formulário de criação/edição
   const [showForm, setShowForm] = useState(false);
@@ -52,12 +72,13 @@ export const Insumos: React.FC = () => {
   const [quickObs, setQuickObs] = useState('');
 
   // Categorias disponíveis
-  const categorias = ['Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Café da manhã', 'Picolé'];
+  const categorias = ['Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Picolé', 'Outros'];
 
   const resetForm = () => {
     setEditingId(null);
     setNome('');
     setCategoria('Carnes e Peixes');
+    setSetor(SETOR_RESTAURANTE);
     setUnidadeMedida('kg');
     setValorEmbalagem('');
     setConteudoEmbalagem('');
@@ -72,6 +93,7 @@ export const Insumos: React.FC = () => {
   const handleOpenCreate = () => {
     if (isColaborador) return;
     resetForm();
+    if (setorAtivo !== 'Todos') setSetor(setorAtivo);
     setShowForm(true);
   };
 
@@ -79,7 +101,8 @@ export const Insumos: React.FC = () => {
     if (isColaborador) return;
     setEditingId(ins.id);
     setNome(ins.nome);
-    setCategoria(ins.categoria);
+    setCategoria(categorias.includes(ins.categoria) ? ins.categoria : 'Outros');
+    setSetor(ins.setor === SETOR_CAFE || ins.setor === SETOR_RESTAURANTE ? ins.setor : getInsumoSetor(ins));
     setUnidadeMedida(ins.unidadeMedida);
     setValorEmbalagem(ins.valorEmbalagem?.toString() || '');
     setConteudoEmbalagem(ins.conteudoEmbalagem?.toString() || '');
@@ -118,6 +141,7 @@ export const Insumos: React.FC = () => {
     const insumoData = {
       nome,
       categoria,
+      setor,
       unidadeMedida,
       valorEmbalagem: valorEmb,
       conteudoEmbalagem: conteudoEmb,
@@ -200,9 +224,13 @@ export const Insumos: React.FC = () => {
     const matchesSearch = ins.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (ins.fornecedor && ins.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'Todas' || ins.categoria === selectedCategory;
+    const matchesSector = setorAtivo === 'Todos' || getInsumoSetor(ins) === setorAtivo;
     const matchesAlert = !filterAlerts || ins.estoqueAtual < ins.estoqueMinimo;
-    return matchesSearch && matchesCategory && matchesAlert;
+    return matchesSearch && matchesCategory && matchesSector && matchesAlert;
   });
+
+  const insumosDoSetor = setorAtivo === 'Todos' ? insumos : insumos.filter(ins => getInsumoSetor(ins) === setorAtivo);
+  const capitalImobilizadoSetor = insumosDoSetor.reduce((total, ins) => total + (ins.estoqueAtual * getEffectiveUnitCost(ins)), 0);
 
   const handleValorEmbalagemChange = (value: string) => {
     setValorEmbalagem(value);
@@ -254,6 +282,38 @@ export const Insumos: React.FC = () => {
             <span>Permissões de edição restritas ao Gestor</span>
           </div>
         )}
+      </div>
+
+      {!setorInicial && (
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="Setor dos insumos">
+        {SETOR_TABS.map(setor => (
+          <button
+            key={setor}
+            type="button"
+            role="tab"
+            aria-selected={setorAtivo === setor}
+            onClick={() => { setSetorAtivo(setor); setSelectedCategory('Todas'); }}
+            className={setorAtivo === setor ? 'whitespace-nowrap border-b-2 border-brand-navy px-4 py-2.5 text-xs font-bold text-brand-navy' : 'whitespace-nowrap border-b-2 border-transparent px-4 py-2.5 text-xs font-bold text-slate-400 hover:border-slate-300 hover:text-slate-700'}
+          >
+            {setor}
+          </button>
+        ))}
+      </div>
+
+      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Setor selecionado</span>
+          <strong className="mt-2 block text-sm font-black text-brand-navy">{setorAtivo === 'Todos' ? 'Estoque geral' : setorAtivo}</strong>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Produtos no setor</span>
+          <strong className="mt-2 block text-2xl font-black text-slate-800">{insumosDoSetor.length}</strong>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Capital do setor</span>
+          <strong className="mt-2 block text-2xl font-black text-slate-800">R$ {capitalImobilizadoSetor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+        </div>
       </div>
 
       {/* Alertas e Mensagens de Feedback */}
@@ -364,6 +424,18 @@ export const Insumos: React.FC = () => {
                 {categorias.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Setor do Estoque *</label>
+              <select
+                value={setor}
+                onChange={(e) => setSetor(e.target.value as SetorEstoque)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
+              >
+                <option value={SETOR_RESTAURANTE}>{SETOR_RESTAURANTE}</option>
+                <option value={SETOR_CAFE}>{SETOR_CAFE}</option>
               </select>
             </div>
 
@@ -545,6 +617,7 @@ export const Insumos: React.FC = () => {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 <th className="py-3.5 px-4">Insumo</th>
+                <th className="py-3.5 px-4">Setor</th>
                 <th className="py-3.5 px-4">Categoria</th>
                 <th className="py-3.5 px-4 text-right">Estoque Atual</th>
                 <th className="py-3.5 px-4 text-right">Capital Imobilizado</th>
@@ -555,7 +628,7 @@ export const Insumos: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredInsumos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-400 font-medium">
+                  <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
                     Nenhum insumo encontrado com os filtros atuais.
                   </td>
                 </tr>
@@ -591,6 +664,7 @@ export const Insumos: React.FC = () => {
                           )}
                         </div>
                       </td>
+                      <td className="py-3 px-4 text-slate-600">{getInsumoSetor(ins)}</td>
                       <td className="py-3 px-4 text-slate-600">{ins.categoria}</td>
                       <td className="py-3 px-4 text-right font-mono font-medium">
                         <span className={estoqueCrítico ? 'text-rose-600 font-bold' : 'text-slate-800'}>

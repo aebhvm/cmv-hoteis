@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { Insumo, SetorEstoque } from '../types';
 import { 
   ClipboardCheck, 
   Search, 
@@ -15,6 +16,15 @@ import {
   X
 } from 'lucide-react';
 
+const SETOR_CAFE: SetorEstoque = 'Café da manhã';
+const SETOR_RESTAURANTE: SetorEstoque = 'Restaurante';
+const SETOR_TABS = ['Todos', SETOR_CAFE, SETOR_RESTAURANTE] as const;
+
+const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
+  if (insumo.setor === SETOR_CAFE || insumo.setor === SETOR_RESTAURANTE) return insumo.setor;
+  return insumo.categoria === SETOR_CAFE ? SETOR_CAFE : SETOR_RESTAURANTE;
+};
+
 export const Inventario: React.FC = () => {
   const { insumos, addMovimentacao, user } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
@@ -22,6 +32,7 @@ export const Inventario: React.FC = () => {
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
+  const [setorAtivo, setSetorAtivo] = useState<'Todos' | SetorEstoque>('Todos');
 
   // Estado das contagens físicas inseridas pelo usuário
   const [contagensFisicas, setContagensFisicas] = useState<{ [id: string]: string }>({});
@@ -29,10 +40,11 @@ export const Inventario: React.FC = () => {
   // Estado de feedback de gravação individual
   const [feedbackSalvos, setFeedbackSalvos] = useState<{ [id: string]: 'salvo' | null }>({});
 
-  const categorias = ['Todas', 'Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Café da manhã', 'Picolé'];
+  const categorias = ['Todas', 'Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Picolé', 'Outros'];
 
   // Valor total teórico do estoque
-  const totalValorTeorico = insumos.reduce((acc, ins) => acc + (ins.estoqueAtual * ins.custoMedio), 0);
+  const insumosDoSetor = setorAtivo === 'Todos' ? insumos : insumos.filter(ins => getInsumoSetor(ins) === setorAtivo);
+  const totalValorTeorico = insumosDoSetor.reduce((acc, ins) => acc + (ins.estoqueAtual * ins.custoMedio), 0);
 
   // Tratar entrada de contagem física
   const handleContagemChange = (id: string, value: string) => {
@@ -110,7 +122,8 @@ export const Inventario: React.FC = () => {
   const filteredInsumos = insumos.filter(ins => {
     const matchesSearch = ins.nome.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todas' || ins.categoria === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesSector = setorAtivo === 'Todos' || getInsumoSetor(ins) === setorAtivo;
+    return matchesSearch && matchesCategory && matchesSector;
   });
 
   return (
@@ -139,6 +152,21 @@ export const Inventario: React.FC = () => {
             Confirmar Todos os Ajustes ({Object.keys(contagensFisicas).length})
           </button>
         )}
+      </div>
+
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="Setor dos insumos">
+        {SETOR_TABS.map(setor => (
+          <button
+            key={setor}
+            type="button"
+            role="tab"
+            aria-selected={setorAtivo === setor}
+            onClick={() => { setSetorAtivo(setor); setSelectedCategory('Todas'); }}
+            className={setorAtivo === setor ? 'whitespace-nowrap border-b-2 border-brand-navy px-4 py-2.5 text-xs font-bold text-brand-navy' : 'whitespace-nowrap border-b-2 border-transparent px-4 py-2.5 text-xs font-bold text-slate-400 hover:border-slate-300 hover:text-slate-700'}
+          >
+            {setor}
+          </button>
+        ))}
       </div>
 
       {/* Informativo de Capital Ativo */}

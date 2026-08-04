@@ -21,7 +21,7 @@ import {
 type SpreadsheetRow = Record<string, unknown>;
 type SpreadsheetCell = string | number | boolean | Date | null;
 
-const INSUMO_HEADERS = ['id', 'nome', 'categoria', 'unidadeMedida', 'custoMedio', 'valorEmbalagem', 'conteudoEmbalagem', 'estoqueAtual', 'estoqueMinimo', 'fornecedor', 'validade', 'unidade'];
+const INSUMO_HEADERS = ['id', 'nome', 'categoria', 'setor', 'unidadeMedida', 'custoMedio', 'valorEmbalagem', 'conteudoEmbalagem', 'estoqueAtual', 'estoqueMinimo', 'fornecedor', 'validade', 'unidade'];
 const FICHA_HEADERS = ['id', 'nome', 'categoria', 'precoVenda', 'rendimentoPorcoes', 'descricao', 'unidade'];
 const INGREDIENTE_HEADERS = ['fichaId', 'insumoId', 'quantidade'];
 const MOVIMENTACAO_HEADERS = ['id', 'insumoId', 'insumoNome', 'tipo', 'quantidade', 'custoUnitario', 'custoTotal', 'data', 'observacao', 'unidade'];
@@ -97,7 +97,7 @@ const parseExcelBackup = async (file: File) => {
       estabelecimento: toString(row.estabelecimento), metaFCP: toNumber(row.metaFCP), senha: toString(row.senha) || undefined
     })),
     allInsumos: readSheetRows(sheets, 'Insumos').map(row => ({
-      id: toString(row.id), nome: toString(row.nome), categoria: toString(row.categoria),
+      id: toString(row.id), nome: toString(row.nome), categoria: toString(row.categoria), setor: toString(row.setor) || undefined,
       unidadeMedida: toString(row.unidadeMedida), custoMedio: toNumber(row.custoMedio),
       valorEmbalagem: toOptionalNumber(row.valorEmbalagem), conteudoEmbalagem: toOptionalNumber(row.conteudoEmbalagem),
       estoqueAtual: toNumber(row.estoqueAtual), estoqueMinimo: toNumber(row.estoqueMinimo),
