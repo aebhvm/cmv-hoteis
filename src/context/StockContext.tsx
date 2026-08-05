@@ -46,6 +46,7 @@ interface StockContextType {
   }) => { success: boolean; error?: string };
   deleteMovimentacao: (id: string) => { success: boolean; error?: string };
   addFicha: (ficha: Omit<FichaTecnica, 'id'>) => void;
+  criarFichasDePicole: () => { created: number; skipped: number };
   updateFicha: (id: string, ficha: Partial<FichaTecnica>) => void;
   deleteFicha: (id: string) => void;
   registrarVenda: (fichaId: string, quantidade: number) => { success: boolean; error?: string };
@@ -176,6 +177,16 @@ const dedupeInsumosById = (items: Insumo[]) => {
     return true;
   });
 };
+const dedupeAutomaticPicoleFichas = (items: FichaTecnica[]) => {
+  const seen = new Set<string>();
+  return items.filter(ficha => {
+    if (!ficha.id.startsWith('fic-picole-')) return true;
+    const key = `${ficha.unidade || ''}::${ficha.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const roundMoneyUp = (value: number) => Math.ceil((value - 1e-9) * 100) / 100;
 
@@ -259,6 +270,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
 
+  const picoleGenerationPendingRef = useRef(false);
   const [currentUnit, setCurrentUnitState] = useState<Unidade>(() => {
     const saved = localStorage.getItem('chef_current_unit');
     return (saved as Unidade) || 'AeB Villa Mayor';
@@ -302,7 +314,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const [allFichas, setAllFichas] = useState<FichaTecnica[]>(() =>
-    readJsonStorage<FichaTecnica[]>('chef_all_fichas', initialCollections.allFichas)
+    dedupeAutomaticPicoleFichas(readJsonStorage<FichaTecnica[]>('chef_all_fichas', initialCollections.allFichas))
   );
 
   const [allMovimentacoes, setAllMovimentacoes] = useState<Movimentacao[]>(() =>
@@ -366,7 +378,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     user,
     users,
     allInsumos: dedupeInsumosById(allInsumos),
-    allFichas,
+    allFichas: dedupeAutomaticPicoleFichas(allFichas),
     allMovimentacoes,
     allVendas,
     allUtensilios,
@@ -389,7 +401,7 @@ useEffect(() => {
         if (!hasActiveSession && data.user) setUser(data.user);
         if (Array.isArray(data.users)) setUsers(data.users);
         if (Array.isArray(data.allInsumos)) setAllInsumos(dedupeInsumosById(data.allInsumos));
-        if (Array.isArray(data.allFichas)) setAllFichas(data.allFichas);
+        if (Array.isArray(data.allFichas)) setAllFichas(dedupeAutomaticPicoleFichas(data.allFichas));
         if (Array.isArray(data.allMovimentacoes)) setAllMovimentacoes(data.allMovimentacoes);
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
         if (Array.isArray(data.allUtensilios)) setAllUtensilios(data.allUtensilios);
@@ -802,6 +814,53 @@ useEffect(() => {
     setAllFichas(prev => [...prev, newFicha]);
   };
 
+  const criarFichasDePicole = () => {
+    if (picoleGenerationPendingRef.current) return { created: 0, skipped: 0 };
+    picoleGenerationPendingRef.current = true;
+    setTimeout(() => { picoleGenerationPendingRef.current = false; }, 0);
+    const normalizeKey = (value: string) =>
+      value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    const fichasSemDuplicatas = dedupeAutomaticPicoleFichas(allFichas);
+    const fichaKeys = new Set(
+      fichasSemDuplicatas.map(ficha => `${ficha.unidade || ''}::${normalizeKey(ficha.nome)}`)
+    );
+    const picoleInsumos = allInsumos.filter(insumo =>
+      Boolean(insumo.unidade) && normalizeKey(insumo.categoria) === 'picole'
+    );
+    const novosPicoles = picoleInsumos.filter(insumo => {
+      const key = `${insumo.unidade || ''}::${normalizeKey(insumo.nome)}`;
+      if (fichaKeys.has(key)) return false;
+      fichaKeys.add(key);
+      return true;
+    });
+    const baseId = Date.now();
+    const novasFichas: FichaTecnica[] = novosPicoles.map((insumo, index) => ({
+      id: `fic-picole-${baseId}-${index}`,
+      nome: insumo.nome,
+      categoria: 'Picolé',
+      ingredientes: [{ insumoId: insumo.id, quantidade: 1 }],
+      precoVenda: 0,
+      rendimentoPorcoes: 1,
+      descricao: 'Ficha automática de 1 unidade',
+      unidade: insumo.unidade
+    }));
+    if (novasFichas.length > 0 || fichasSemDuplicatas.length !== allFichas.length) {
+      setAllFichas(prev => {
+        const semDuplicatas = dedupeAutomaticPicoleFichas(prev);
+        const keys = new Set(semDuplicatas.map(ficha => `${ficha.unidade || ''}::${normalizeKey(ficha.nome)}`));
+        const novasSeguras = novasFichas.filter(ficha => {
+          const key = `${ficha.unidade || ''}::${normalizeKey(ficha.nome)}`;
+          if (keys.has(key)) return false;
+          keys.add(key);
+          return true;
+        });
+        return [...semDuplicatas, ...novasSeguras];
+      });
+    }
+    return { created: novasFichas.length, skipped: picoleInsumos.length - novasFichas.length };
+  };
+
+
   const updateFicha = (id: string, updatedFields: Partial<FichaTecnica>) => {
     setAllFichas(prev => prev.map(fic => {
       if (fic.id === id) {
@@ -1045,7 +1104,7 @@ useEffect(() => {
       }
 
       if (Array.isArray(data.allFichas)) {
-        setAllFichas(data.allFichas);
+        setAllFichas(dedupeAutomaticPicoleFichas(data.allFichas));
       } else if (Array.isArray(data.fichas)) {
         setAllFichas(prev => [...prev.filter(f => f.unidade !== currentUnit), ...data.fichas.map((f: FichaTecnica) => ({ ...f, unidade: currentUnit }))]);
       }
@@ -1104,6 +1163,7 @@ useEffect(() => {
       addMovimentacao,
       updateMovimentacao,
       deleteMovimentacao,
+      criarFichasDePicole,
       addFicha,
       updateFicha,
       deleteFicha,

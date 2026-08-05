@@ -10,7 +10,8 @@ import {
   ChevronRight,
   Package,
   ShoppingBag,
-  CalendarClock
+  CalendarClock,
+  CalendarDays
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -28,9 +29,37 @@ import {
 interface DashboardProps {
   onNavigate: (tab: string) => void;
 }
+const toMonthKey = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const formatMonthLabel = (monthKey: string) => {
+  const date = new Date(`${monthKey}-01T12:00:00`);
+  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, addMovimentacao } = useStock();
+  const mesAtual = toMonthKey(new Date().toISOString());
+  const [mesSelecionado, setMesSelecionado] = React.useState(mesAtual);
+
+  const opcoesDeMes = React.useMemo(() => {
+    const meses = new Set([mesAtual]);
+    [...vendas.map(v => toMonthKey(v.data)), ...movimentacoes.map(m => toMonthKey(m.data))]
+      .filter(Boolean)
+      .forEach(mes => meses.add(mes));
+    return Array.from(meses).sort((a, b) => b.localeCompare(a));
+  }, [mesAtual, vendas, movimentacoes]);
+
+  const vendasDoPeriodo = mesSelecionado === 'todos'
+    ? vendas
+    : vendas.filter(v => toMonthKey(v.data) === mesSelecionado);
+  const movimentacoesDoPeriodo = mesSelecionado === 'todos'
+    ? movimentacoes
+    : movimentacoes.filter(m => toMonthKey(m.data) === mesSelecionado);
+  const periodoLabel = mesSelecionado === 'todos' ? 'Todos os meses' : formatMonthLabel(mesSelecionado);
   const [discardingIds, setDiscardingIds] = React.useState<string[]>([]);
 
   // 1. Valor Total do Estoque Ativo
@@ -75,18 +104,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     });
   };
 
-  // 3. Faturamento Acumulado e CMV das Vendas
-  const faturamentoTotal = vendas.reduce((acc, v) => acc + v.receitaTotal, 0);
-  const custoInsumosVendas = vendas.reduce((acc, v) => acc + v.custoInsumosTotal, 0);
+  // 3. Faturamento e CMV das vendas no periodo selecionado
+  const faturamentoTotal = vendasDoPeriodo.reduce((acc, v) => acc + v.receitaTotal, 0);
+  const custoInsumosVendas = vendasDoPeriodo.reduce((acc, v) => acc + v.custoInsumosTotal, 0);
 
   // 4. Desperdício Financeiro Registrado
-  const desperdicioTotal = movimentacoes
+  const desperdicioTotal = movimentacoesDoPeriodo
     .filter(m => m.tipo === 'desperdicio')
     .reduce((acc, m) => acc + m.custoTotal, 0);
 
   // 5. CMV Real / Operacional (Custo das vendas + Desperdícios + Diferenças negativas de inventário)
   // Nota: Movimentações do tipo 'ajuste' com valor negativo também contam como quebra/perda
-  const quebrasAjuste = movimentacoes
+  const quebrasAjuste = movimentacoesDoPeriodo
     .filter(m => m.tipo === 'ajuste' && m.quantidade < 0)
     .reduce((acc, m) => acc + Math.abs(m.custoTotal), 0);
 
@@ -115,7 +144,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   // Dados para o Gráfico de Desempenho (Visão Financeira Semanal/Diária Simples)
   // Agrupar vendas por dia para simular histórico
-  const vendasAgrupadas = vendas.reduce((acc: { [key: string]: { receita: number; custo: number } }, v) => {
+  const vendasAgrupadas = vendasDoPeriodo.reduce((acc: { [key: string]: { receita: number; custo: number } }, v) => {
     const dataFormatada = new Date(v.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     if (!acc[dataFormatada]) {
       acc[dataFormatada] = { receita: 0, custo: 0 };
@@ -126,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   }, {});
 
   // Agrupar desperdícios por dia para incluir no gráfico
-  const desperdiciosAgrupados = movimentacoes
+  const desperdiciosAgrupados = movimentacoesDoPeriodo
     .filter(m => m.tipo === 'desperdicio')
     .reduce((acc: { [key: string]: number }, m) => {
       const dataFormatada = new Date(m.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -149,7 +178,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   });
 
   // Top Insumos com maior desperdício
-  const desperdicioPorInsumo: Record<string, { nome: string; valor: number; qtd: number; un: string }> = movimentacoes
+  const desperdicioPorInsumo: Record<string, { nome: string; valor: number; qtd: number; un: string }> = movimentacoesDoPeriodo
     .filter(m => m.tipo === 'desperdicio')
     .reduce((acc, m) => {
       if (!acc[m.insumoId]) {
@@ -181,11 +210,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             Olá, <strong className="text-slate-700">{user.nome}</strong>. Acompanhe a eficiência operacional e margens do seu estoque.
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200/60">
-          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-xs font-semibold text-slate-600 font-mono">
-            Sincronizado: {new Date().toLocaleDateString('pt-BR')}
-          </span>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200/60">
+            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-semibold text-slate-600 font-mono">
+              Sincronizado: {new Date().toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+          <label className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/60">
+            <CalendarDays className="w-4 h-4 text-brand-navy shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Periodo</span>
+            <select
+              id="dashboard-periodo"
+              value={mesSelecionado}
+              onChange={(event) => setMesSelecionado(event.target.value)}
+              className="bg-transparent text-xs font-bold text-brand-navy outline-none cursor-pointer max-w-[170px]"
+              aria-label="Filtrar painel por mes"
+            >
+              <option value={mesAtual}>Mes atual ({formatMonthLabel(mesAtual)})</option>
+              <option value="todos">Todos os meses</option>
+              {opcoesDeMes.filter(mes => mes !== mesAtual).map(mes => (
+                <option key={mes} value={mes}>{formatMonthLabel(mes)}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 

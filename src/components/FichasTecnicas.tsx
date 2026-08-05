@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { FichaTecnica, IngredienteFicha, Insumo } from '../types';
 import { 
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 export const FichasTecnicas: React.FC = () => {
-  const { fichas, insumos, addFicha, updateFicha, deleteFicha, getFichaCusto, user } = useStock();
+  const { fichas, insumos, addFicha, updateFicha, deleteFicha, getFichaCusto, user, criarFichasDePicole } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
 
   // Estados para busca e seleção
@@ -53,9 +53,11 @@ export const FichasTecnicas: React.FC = () => {
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const autoPicoleCheckRef = useRef(false);
 
   // Categorias de fichas
   const categoriasFichas = ['Pratos Principais', 'Entradas', 'Sobremesas', 'Bebidas', 'Porções', 'Outros'];
+  const categoriasFichasComPicole = [...categoriasFichas, 'Picolé'];
 
   const resetForm = () => {
     setEditingId(null);
@@ -273,6 +275,15 @@ export const FichasTecnicas: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (isColaborador || autoPicoleCheckRef.current) return;
+    autoPicoleCheckRef.current = true;
+    const result = criarFichasDePicole();
+    if (result.created > 0) {
+      setSuccessMsg(`${result.created} ficha(s) de Picolé criada(s) automaticamente com 1 unidade.`);
+    }
+  }, []);
+
   return (
     <div className="min-w-0 space-y-6" id="fichas-tecnicas-view">
       {/* Cabeçalho */}
@@ -359,7 +370,7 @@ export const FichasTecnicas: React.FC = () => {
                   onChange={(e) => setCategoria(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 cursor-pointer"
                 >
-                  {categoriasFichas.map(cat => (
+                  {categoriasFichasComPicole.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -634,7 +645,7 @@ export const FichasTecnicas: React.FC = () => {
                 className="min-w-0 flex-1 bg-transparent text-slate-700 focus:outline-none cursor-pointer font-bold sm:flex-none"
               >
                 <option value="Todas">Todas</option>
-                {categoriasFichas.map(cat => (
+                {categoriasFichasComPicole.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
