@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { FichaTecnica, IngredienteFicha, Insumo } from '../types';
 import { 
@@ -53,7 +53,6 @@ export const FichasTecnicas: React.FC = () => {
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const autoPicoleCheckRef = useRef(false);
 
   // Categorias de fichas
   const categoriasFichas = ['Pratos Principais', 'Entradas', 'Sobremesas', 'Bebidas', 'Porções', 'Outros'];
@@ -274,15 +273,19 @@ export const FichasTecnicas: React.FC = () => {
       setUnidadeInserida('principal');
     }
   };
+  const autoPicoleSyncKey = [
+    ...insumos.map(insumo => `${insumo.id}:${insumo.nome}:${insumo.categoria}`),
+    ...fichas.map(ficha => `${ficha.id}:${ficha.nome}`)
+  ].join('|');
+
 
   useEffect(() => {
-    if (isColaborador || autoPicoleCheckRef.current) return;
-    autoPicoleCheckRef.current = true;
+    if (isColaborador) return;
     const result = criarFichasDePicole();
     if (result.created > 0) {
       setSuccessMsg(`${result.created} ficha(s) de Picolé criada(s) automaticamente com 1 unidade.`);
     }
-  }, []);
+  }, [isColaborador, autoPicoleSyncKey]);
 
   return (
     <div className="min-w-0 space-y-6" id="fichas-tecnicas-view">
