@@ -18,12 +18,20 @@ import {
   X
 } from 'lucide-react';
 
+const BRASILIA_TIME_ZONE = 'America/Sao_Paulo';
+const brasiliaDateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: BRASILIA_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+
 const toLocalDateKey = (value: string | Date) => {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = value instanceof Date ? value : new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const parts = brasiliaDateFormatter.formatToParts(date);
+  const getPart = (type: string) => parts.find(part => part.type === type)?.value || '';
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
 };
 
 const toMovementIso = (dateKey: string, previousDate?: string) => {
@@ -698,8 +706,8 @@ export const Movimentacoes: React.FC = () => {
                     </tr>
                     {group.items.map(m => {
                   const dataObj = new Date(m.data);
-                  const dataFormatada = dataObj.toLocaleDateString('pt-BR');
-                  const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  const dataFormatada = dataObj.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE });
+                  const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
                   
                   const estiloBadge = getTipoEstilo(m.tipo);
                   const ins = insumos.find(i => i.id === m.insumoId);
