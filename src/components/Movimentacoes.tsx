@@ -273,6 +273,10 @@ export const Movimentacoes: React.FC = () => {
     ? new Date(`${selectedDate}T12:00:00`).toLocaleDateString('pt-BR')
     : 'Todo o período';
 
+  const selectedTypeLabel = selectedType === 'entrada' ? 'Entradas' : selectedType === 'saida' ? 'Sa\u00eddas' : selectedType === 'desperdicio' ? 'Desperd\u00edcio' : selectedType === 'ajuste' ? 'Ajustes' : 'Entradas';
+  const totalSelecionadoR$ = movimentosDaData.reduce((acc, m) => acc + m.custoTotal, 0);
+  const totalResumoPrincipalR$ = selectedType === 'todos' ? totalEntradasR$ : totalSelecionadoR$;
+
   const getTipoEstilo = (tipo: string) => {
       <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="Setor das movimentações">
         {SETOR_TABS.map(setor => (
@@ -368,9 +372,9 @@ export const Movimentacoes: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
           <div>
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Entradas - {selectedDateLabel}</span>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">{selectedTypeLabel} - {selectedDateLabel}</span>
             <span className="text-xl font-black text-slate-800 font-mono mt-1">
-              R$ {totalEntradasR$.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              R$ {totalResumoPrincipalR$.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div className="p-2.5 bg-emerald-50 rounded-lg text-emerald-600">
