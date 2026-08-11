@@ -185,7 +185,7 @@ export const Movimentacoes: React.FC = () => {
   };
 
 
-  const handleOpenCreate = (initialType: 'entrada' | 'saida' = 'entrada') => {
+  const handleOpenCreate = (initialType: 'entrada' | 'saida' | 'desperdicio' = 'entrada') => {
     setEditingMovId(null);
     setInsumoId('');
     setInsumoSearchTerm('');
@@ -321,7 +321,7 @@ export const Movimentacoes: React.FC = () => {
           <h2 className="text-xl font-bold text-slate-800">Fluxo de Entradas, Saídas e Perdas</h2>
           <p className="text-xs text-slate-500">Lance compras, registre quebras ou desperdícios e audite o histórico de movimentações do restaurante</p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             onClick={() => handleOpenCreate('entrada')}
             className="px-4 py-2 bg-brand-navy hover:bg-brand-navy/90 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-sm transition-all hover:scale-[1.01] cursor-pointer"
@@ -331,14 +331,24 @@ export const Movimentacoes: React.FC = () => {
             {isColaborador ? 'Entrada' : 'Registrar Movimentação'}
           </button>
           {isColaborador && (
-            <button
-              onClick={() => handleOpenCreate('saida')}
-              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-300 flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
-              id="btn-lancar-saida"
-            >
-              <TrendingDown className="w-4 h-4 text-rose-600 stroke-[2.5]" />
-              Saída
-            </button>
+            <>
+              <button
+                onClick={() => handleOpenCreate('saida')}
+                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-300 flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+                id="btn-lancar-saida"
+              >
+                <TrendingDown className="w-4 h-4 text-rose-600 stroke-[2.5]" />
+                Saída
+              </button>
+              <button
+                onClick={() => handleOpenCreate('desperdicio')}
+                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-sm rounded-xl border border-rose-200 flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+                id="btn-lancar-desperdicio"
+              >
+                <AlertOctagon className="w-4 h-4 stroke-[2.5]" />
+                Desperdício
+              </button>
+            </>
           )}
         </div>
       </div>
