@@ -261,11 +261,7 @@ export const Movimentacoes: React.FC = () => {
     return groups;
   }, []);
 
-  const movimentosDaData = movimentacoes.filter(m => {
-    const matchesDate = !selectedDate || toLocalDateKey(m.data) === selectedDate;
-    const matchesSector = setorAtivo === 'Todos' || getMovimentacaoSetor(m) === setorAtivo;
-    return matchesDate && matchesSector;
-  });
+  const movimentosDaData = filteredMovs;
   const totalEntradasR$ = movimentosDaData
     .filter(m => m.tipo === 'entrada')
     .reduce((acc, m) => acc + m.custoTotal, 0);
