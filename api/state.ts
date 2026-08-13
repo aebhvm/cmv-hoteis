@@ -200,7 +200,7 @@ export default async function handler(req: any, res: any) {
           continue;
         }
 
-        if (body.revision !== undefined && String(body.revision) !== String(current[0].revision)) {
+        if (body.revision === undefined || String(body.revision) !== String(current[0].revision)) {
           return res.status(409).json({
             error: 'State conflict.',
             state: { ...normalizeState(current[0].data), _revision: String(current[0].revision) }
