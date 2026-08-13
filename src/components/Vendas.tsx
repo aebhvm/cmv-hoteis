@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle,
   Edit2,
   History,
@@ -11,6 +12,27 @@ import {
   X
 } from 'lucide-react';
 
+const BRASILIA_TIME_ZONE = 'America/Sao_Paulo';
+
+const getBrasiliaMonthKey = (value: string) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BRASILIA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(new Date(value));
+  const year = parts.find(part => part.type === 'year')?.value;
+  const month = parts.find(part => part.type === 'month')?.value;
+  return year && month ? `${year}-${month}` : '';
+};
+
+const formatMonthLabel = (monthKey: string) => {
+  const [year, month] = monthKey.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
 export const Vendas: React.FC = () => {
   const { fichas, registrarVenda, updateVenda, deleteVenda, vendas, insumos } = useStock();
 
@@ -18,14 +40,21 @@ export const Vendas: React.FC = () => {
   const [quantidadeVenda, setQuantidadeVenda] = useState('1');
   const [editingVendaId, setEditingVendaId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [periodoSelecionado, setPeriodoSelecionado] = useState('todos');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const hoje = new Date().toISOString().slice(0, 10);
-  const vendasHoje = vendas.filter(v => v.data.slice(0, 10) === hoje);
-  const faturamentoHoje = vendasHoje.reduce((acc, v) => acc + v.receitaTotal, 0);
-  const custoInsumosHoje = vendasHoje.reduce((acc, v) => acc + v.custoInsumosTotal, 0);
-  const lucroHoje = faturamentoHoje - custoInsumosHoje;
+  const mesesDisponiveis: string[] = Array.from(new Set<string>(vendas.map(venda => getBrasiliaMonthKey(venda.data)).filter(Boolean)))
+    .sort((a, b) => b.localeCompare(a));
+  const vendasFiltradas = periodoSelecionado === 'todos'
+    ? vendas
+    : vendas.filter(venda => getBrasiliaMonthKey(venda.data) === periodoSelecionado);
+  const faturamentoFiltrado = vendasFiltradas.reduce((acc, venda) => acc + venda.receitaTotal, 0);
+  const custoInsumosFiltrado = vendasFiltradas.reduce((acc, venda) => acc + venda.custoInsumosTotal, 0);
+  const lucroFiltrado = faturamentoFiltrado - custoInsumosFiltrado;
+  const periodoLabel = periodoSelecionado === 'todos'
+    ? 'Todos os meses'
+    : formatMonthLabel(periodoSelecionado);
 
   const normalizeText = (value: string) => value
     .normalize('NFD')
@@ -247,19 +276,39 @@ export const Vendas: React.FC = () => {
 
         <div>
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Resumo do Turno / Dia</span>
+            <div className="space-y-2">
+              <label htmlFor="vendas-periodo" className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                <CalendarDays className="w-3.5 h-3.5" />
+                Período do faturamento
+              </label>
+              <select
+                id="vendas-periodo"
+                value={periodoSelecionado}
+                onChange={event => setPeriodoSelecionado(event.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+              >
+                <option value="todos">Todos os meses</option>
+                {mesesDisponiveis.map(monthKey => (
+                  <option key={monthKey} value={monthKey}>{formatMonthLabel(monthKey)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Resumo do faturamento</span>
+              <span className="text-[10px] text-slate-500 capitalize">{periodoLabel}</span>
+            </div>
             <div className="space-y-3 font-mono text-xs">
               <div className="flex justify-between items-center text-slate-500">
                 <span>Faturamento Total:</span>
-                <span className="font-bold text-slate-800">R$ {faturamentoHoje.toFixed(2)}</span>
+                <span className="font-bold text-slate-800">R$ {faturamentoFiltrado.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-slate-500">
                 <span>Custo CMV Teórico (Insumos):</span>
-                <span className="font-bold text-slate-600">- R$ {custoInsumosHoje.toFixed(2)}</span>
+                <span className="font-bold text-slate-600">- R$ {custoInsumosFiltrado.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center border-t border-slate-100 pt-2.5">
                 <span className="text-xs font-bold text-slate-700">Lucro Bruto Simulado:</span>
-                <span className="text-sm font-bold text-emerald-600">R$ {lucroHoje.toFixed(2)}</span>
+                <span className="text-sm font-bold text-emerald-600">R$ {lucroFiltrado.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -357,9 +406,12 @@ export const Vendas: React.FC = () => {
       )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" id="vendas-history-box">
-        <div className="bg-slate-50 p-4 border-b border-slate-200 flex items-center gap-2">
-          <History className="w-4 h-4 text-brand-navy" />
-          <span className="text-xs font-bold text-slate-800">Últimas Vendas Processadas (Dedução de Estoque)</span>
+        <div className="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-brand-navy" />
+            <span className="text-xs font-bold text-slate-800">Vendas processadas</span>
+          </div>
+          <span className="text-[10px] font-semibold text-slate-500 capitalize">{periodoLabel} · {vendasFiltradas.length} lançamentos</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -377,19 +429,19 @@ export const Vendas: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
-              {vendas.length === 0 ? (
+              {vendasFiltradas.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-400">
-                    Nenhuma venda processada nas últimas horas.
+                    Nenhuma venda processada neste período.
                   </td>
                 </tr>
               ) : (
-                vendas.map(venda => {
+                vendasFiltradas.map(venda => {
                   const margem = venda.receitaTotal - venda.custoInsumosTotal;
                   return (
                     <tr key={venda.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-mono text-slate-400">
-                        {new Date(venda.data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(venda.data).toLocaleString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-800">{venda.fichaNome}</td>
                       <td className="py-3 px-4 text-right font-mono font-medium">{venda.quantidade}x</td>
