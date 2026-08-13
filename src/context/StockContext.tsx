@@ -395,6 +395,9 @@ useEffect(() => {
       })
       .then(data => {
         if (!active) return;
+        const remoteSnapshot = snapshotFromRemote(data);
+        remoteBaseStateRef.current = remoteSnapshot;
+        latestSnapshotRef.current = remoteSnapshot;
         remoteRevisionRef.current = data._revision || null;
         const hasActiveSession = sessionStorage.getItem('chef_is_logged_in') === 'true';
         if (!hasActiveSession && data.currentUnit) setCurrentUnitState(data.currentUnit);
@@ -406,7 +409,6 @@ useEffect(() => {
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
         if (Array.isArray(data.allUtensilios)) setAllUtensilios(data.allUtensilios);
         if (Array.isArray(data.allMovimentacoesUtensilios)) setAllMovimentacoesUtensilios(data.allMovimentacoesUtensilios);
-        remoteBaseStateRef.current = snapshotFromRemote(data);
         remoteStateReadyRef.current = true;
       })
       .catch(() => {
@@ -441,11 +443,22 @@ useEffect(() => {
       syncInFlightRef.current = true;
       let saved = false;
       try {
-        const response = await fetch('/api/state', {
+        let response = await fetch('/api/state', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ patch })
+          body: JSON.stringify({ patch, revision: remoteRevisionRef.current })
         });
+        if (response.status === 409) {
+          const conflict = await response.json();
+          remoteRevisionRef.current = conflict.state?._revision || null;
+          remoteBaseStateRef.current = snapshotFromRemote(conflict.state);
+          response = await fetch('/api/state', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patch, revision: remoteRevisionRef.current })
+          });
+        }
+
         if (!response.ok) throw new Error('Remote state unavailable');
 
         const result = await response.json();
