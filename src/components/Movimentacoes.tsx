@@ -178,7 +178,6 @@ export const Movimentacoes: React.FC = () => {
     setEditingMovId(null);
     setSetorMovimentacao(setorAtivo === 'Todos' ? SETOR_RESTAURANTE : setorAtivo);
     setErrorMsg('');
-    setDataMovimentacao(toLocalDateKey(new Date()));
     setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');
     window.requestAnimationFrame(() => firstMovementFieldRef.current?.focus());
     setTimeout(() => setSuccessMsg(''), 3000);
@@ -195,7 +194,6 @@ export const Movimentacoes: React.FC = () => {
     setCustoUnitario('');
     setObservacao('');
     setErrorMsg('');
-    setDataMovimentacao(toLocalDateKey(new Date()));
     setShowForm(true);
   };
 
