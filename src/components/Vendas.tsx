@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { formatMoney } from '../utils/formatMoney';
 import {
   AlertTriangle,
   CalendarDays,
@@ -247,7 +248,7 @@ export const Vendas: React.FC = () => {
                           {ficha.nome}
                         </span>
                         <span className="font-mono text-xs font-bold text-brand-navy shrink-0">
-                          R$ {ficha.precoVenda.toFixed(2)}
+                          R$ {formatMoney(ficha.precoVenda)}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
@@ -300,15 +301,15 @@ export const Vendas: React.FC = () => {
             <div className="space-y-3 font-mono text-xs">
               <div className="flex justify-between items-center text-slate-500">
                 <span>Faturamento Total:</span>
-                <span className="font-bold text-slate-800">R$ {faturamentoFiltrado.toFixed(2)}</span>
+                <span className="font-bold text-slate-800">R$ {formatMoney(faturamentoFiltrado)}</span>
               </div>
               <div className="flex justify-between items-center text-slate-500">
                 <span>Custo CMV Teórico (Insumos):</span>
-                <span className="font-bold text-slate-600">- R$ {custoInsumosFiltrado.toFixed(2)}</span>
+                <span className="font-bold text-slate-600">- R$ {formatMoney(custoInsumosFiltrado)}</span>
               </div>
               <div className="flex justify-between items-center border-t border-slate-100 pt-2.5">
                 <span className="text-xs font-bold text-slate-700">Lucro Bruto Simulado:</span>
-                <span className="text-sm font-bold text-emerald-600">R$ {lucroFiltrado.toFixed(2)}</span>
+                <span className="text-sm font-bold text-emerald-600">R$ {formatMoney(lucroFiltrado)}</span>
               </div>
             </div>
           </div>
@@ -355,7 +356,7 @@ export const Vendas: React.FC = () => {
               <div className="pb-3 border-b border-slate-100">
                 <span className="text-xs text-slate-400 block">Valor unitário</span>
                 <span className="text-sm font-bold font-mono text-brand-navy mt-1 block">
-                  R$ {selectedFicha.precoVenda.toFixed(2)}
+                  R$ {formatMoney(selectedFicha.precoVenda)}
                 </span>
               </div>
 
@@ -380,7 +381,7 @@ export const Vendas: React.FC = () => {
               <div className="p-3 bg-slate-50 rounded-lg flex justify-between items-center text-xs border border-slate-100">
                 <span className="text-slate-500 font-semibold">Valor Total do Pedido:</span>
                 <strong className="text-sm font-bold text-slate-800 font-mono">
-                  R$ {((Number(quantidadeVenda || 1)) * selectedFicha.precoVenda).toFixed(2)}
+                  R$ {formatMoney((Number(quantidadeVenda || 1)) * selectedFicha.precoVenda)}
                 </strong>
               </div>
 
@@ -445,10 +446,10 @@ export const Vendas: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-800">{venda.fichaNome}</td>
                       <td className="py-3 px-4 text-right font-mono font-medium">{venda.quantidade}x</td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500">R$ {venda.precoVendaUnitario.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">R$ {venda.receitaTotal.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-mono text-rose-600">- R$ {venda.custoInsumosTotal.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-emerald-600">R$ {margem.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-500">R$ {formatMoney(venda.precoVendaUnitario)}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">R$ {formatMoney(venda.receitaTotal)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-rose-600">- R$ {formatMoney(venda.custoInsumosTotal)}</td>
+                      <td className="py-3 px-4 text-right font-mono font-black text-emerald-600">R$ {formatMoney(margem)}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1.5">
                           <button

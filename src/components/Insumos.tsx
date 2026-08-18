@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { formatMoney } from '../utils/formatMoney';
 import { Insumo, SetorEstoque } from '../types';
 import { 
   Plus, 
@@ -593,7 +594,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                 value={quickCost}
                 onChange={(e) => setQuickCost(e.target.value)}
                 className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
-                placeholder={`Sugestão: R$ ${insumos.find(i => i.id === quickAddId)?.custoMedio.toFixed(2)}`}
+                placeholder={`Sugestão: R$ ${formatMoney(insumos.find(i => i.id === quickAddId)?.custoMedio || 0)}`}
               />
             </div>
 

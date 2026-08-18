@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStock } from '../context/StockContext';
+import { formatMoney } from '../utils/formatMoney';
 import {
   TrendingUp,
   AlertTriangle,
@@ -252,7 +253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-black text-slate-800 font-sans">
-              R$ {valorTotalEstoque.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              R$ {formatMoney(valorTotalEstoque)}
             </h3>
             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
               Soma total de insumos no estoque físico
@@ -318,7 +319,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-black text-rose-600 font-sans">
-              R$ {desperdicioTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              R$ {formatMoney(desperdicioTotal)}
             </h3>
             <p className="text-xs text-rose-600 mt-1 flex items-center gap-1">
               Prejuízo direto por perdas e descarte
@@ -373,7 +374,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <div>
             <span className="font-bold block text-amber-900">Atenção ao Vazamento de Margem!</span>
             Seu CMV Real ({cmvRealPorcentagem.toFixed(1)}%) está acima da meta ({user.metaFCP}%).
-            O desperdício acumulado de <strong className="text-slate-900">R$ {desperdicioTotal.toFixed(2)}</strong> e quebras representam {(cmvRealPorcentagem - cmvTeoricoPorcentagem).toFixed(1)}% adicionais de custo operacional. Reduzir as perdas trará sua margem de volta à meta.
+            O desperdício acumulado de <strong className="text-slate-900">R$ {formatMoney(desperdicioTotal)}</strong> e quebras representam {(cmvRealPorcentagem - cmvTeoricoPorcentagem).toFixed(1)}% adicionais de custo operacional. Reduzir as perdas trará sua margem de volta à meta.
           </div>
         </div>
       )}
@@ -443,7 +444,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value) => `R$ ${Number(value).toFixed(2)}`}
+                    formatter={(value) => `R$ ${formatMoney(Number(value))}`}
                     contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '8px', color: '#0f172a' }}
                   />
                 </PieChart>
@@ -453,7 +454,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
               <span className="text-[10px] text-slate-400 uppercase tracking-widest">Estoque Total</span>
               <span className="text-lg font-black text-slate-800 font-mono">
-                R$ {valorTotalEstoque.toFixed(0)}
+                R$ {formatMoney(valorTotalEstoque)}
               </span>
             </div>
           </div>
@@ -467,7 +468,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <span className="truncate max-w-[140px] font-medium">{item.name}</span>
                 </div>
                 <span className="font-mono text-slate-500">
-                  R$ {item.value.toFixed(0)} ({((item.value / (valorTotalEstoque || 1)) * 100).toFixed(0)}%)
+                  R$ {formatMoney(item.value)} ({((item.value / (valorTotalEstoque || 1)) * 100).toFixed(0)}%)
                 </span>
               </div>
             ))}
@@ -569,7 +570,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     </div>
                     <div className="text-right">
                       <span className="text-sm font-bold text-rose-600 block font-mono">
-                        - R$ {item.valor.toFixed(2)}
+                        - R$ {formatMoney(item.valor)}
                       </span>
                       <span className="text-[10px] text-slate-400 block">
                         Impacto direto no CMV

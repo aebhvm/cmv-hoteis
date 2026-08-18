@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { formatMoney } from '../utils/formatMoney';
 import readExcelFile from 'read-excel-file/browser';
 import writeExcelFile from 'write-excel-file/browser';
 import { 
@@ -320,7 +321,7 @@ export const Relatorios: React.FC = () => {
               </p>
               <div className="border-t border-slate-100 mt-3 pt-2 text-xs font-mono flex justify-between text-slate-600">
                 <span>Custo Teórico Acumulado:</span>
-                <strong className="text-slate-800 font-bold">R$ {custoTeoricoAcumulado.toFixed(2)}</strong>
+                <strong className="text-slate-800 font-bold">R$ {formatMoney(custoTeoricoAcumulado)}</strong>
               </div>
             </div>
 
@@ -336,7 +337,7 @@ export const Relatorios: React.FC = () => {
               </p>
               <div className="border-t border-slate-100 mt-3 pt-2 text-xs font-mono flex justify-between text-slate-600">
                 <span>Custo Real Acumulado:</span>
-                <strong className="text-slate-800 font-bold">R$ {cmvOperacionalReal.toFixed(2)}</strong>
+                <strong className="text-slate-800 font-bold">R$ {formatMoney(cmvOperacionalReal)}</strong>
               </div>
             </div>
           </div>
@@ -348,7 +349,7 @@ export const Relatorios: React.FC = () => {
               Impacto do Desperdício Financeiro
             </span>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Do total faturado de <strong className="text-slate-800 font-bold">R$ {receitaAcumulada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>, você gastou <strong className="text-slate-800 font-bold">R$ {totalDesperdicioAcumulado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> em desperdícios e descarte direto na cozinha. 
+              Do total faturado de <strong className="text-slate-800 font-bold">R$ {formatMoney(receitaAcumulada)}</strong>, você gastou <strong className="text-slate-800 font-bold">R$ {formatMoney(totalDesperdicioAcumulado)}</strong> em desperdícios e descarte direto na cozinha.
               Esse vazamento financeiro consome exatamente <strong className="text-rose-600 font-bold">{desperdicioFaturamentoPerc.toFixed(1)}%</strong> do seu faturamento bruto, reduzindo a sua margem líquida final.
             </p>
           </div>
@@ -372,7 +373,7 @@ export const Relatorios: React.FC = () => {
               >
                 <option value="">-- Escolha o Insumo --</option>
                 {insumos.map(ins => (
-                  <option key={ins.id} value={ins.id}>{ins.nome} (R$ {ins.custoMedio.toFixed(2)}/{ins.unidadeMedida})</option>
+                  <option key={ins.id} value={ins.id}>{ins.nome} (R$ {formatMoney(ins.custoMedio)}/{ins.unidadeMedida})</option>
                 ))}
               </select>
             </div>
@@ -407,8 +408,8 @@ export const Relatorios: React.FC = () => {
                         <div key={f.id} className="p-2.5 bg-slate-50 rounded-lg text-[11px] space-y-1 border border-slate-100">
                           <strong className="text-slate-800 block">{f.nome}</strong>
                           <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                            <span>Original: R$ {f.custoOriginal.toFixed(2)} ({f.fcpOriginal.toFixed(0)}%)</span>
-                            <span>→ Simulado: R$ {f.custoSimulado.toFixed(2)} ({f.fcpSimulado.toFixed(0)}%)</span>
+                            <span>Original: R$ {formatMoney(f.custoOriginal)} ({f.fcpOriginal.toFixed(0)}%)</span>
+                            <span>→ Simulado: R$ {formatMoney(f.custoSimulado)} ({f.fcpSimulado.toFixed(0)}%)</span>
                           </div>
                           <span className="text-[10px] font-bold text-rose-600 block text-right">
                             CMV Sobe { (f.fcpSimulado - f.fcpOriginal).toFixed(1) }%

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { formatMoney } from '../utils/formatMoney';
 import { Insumo, Movimentacao, SetorEstoque } from '../types';
 import { 
   Plus, 
@@ -746,7 +747,7 @@ export const Movimentacoes: React.FC = () => {
                         <span className="text-[10px] text-slate-400 uppercase">{ins?.unidadeMedida || ''}</span>
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono text-slate-400">
-                        {m.custoUnitario ? `R$ ${m.custoUnitario.toFixed(2)}` : '-'}
+                        {m.custoUnitario ? `R$ ${formatMoney(m.custoUnitario)}` : '-'}
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-800">
                         R$ {m.custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

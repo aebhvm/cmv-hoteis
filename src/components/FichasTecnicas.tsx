@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { formatMoney } from '../utils/formatMoney';
 import { FichaTecnica, IngredienteFicha, Insumo } from '../types';
 import { 
   Plus, 
@@ -454,7 +455,7 @@ export const FichasTecnicas: React.FC = () => {
                             >
                               <span className="block text-xs font-bold text-slate-800">{ins.nome}</span>
                               <span className="block text-[10px] text-slate-500 font-mono">
-                                R$ {getCustoPorEmbalagem(ins, 1).toFixed(2)}
+                                R$ {formatMoney(getCustoPorEmbalagem(ins, 1))}
                               </span>
                             </button>
                           ))
@@ -558,7 +559,7 @@ export const FichasTecnicas: React.FC = () => {
                           <tr key={ing.insumoId} className="hover:bg-slate-50/50">
                             <td className="py-2 px-3 text-slate-800 font-bold">{ins.nome}</td>
                             <td className="py-2 px-3 text-right font-mono text-slate-700">{qtFriendly}</td>
-                            <td className="py-2 px-3 text-right font-mono text-slate-800 font-bold">R$ {itemCusto.toFixed(2)}</td>
+                            <td className="py-2 px-3 text-right font-mono text-slate-800 font-bold">R$ {formatMoney(itemCusto)}</td>
                             <td className="py-1 px-3 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button
@@ -701,12 +702,12 @@ export const FichasTecnicas: React.FC = () => {
                     <div className="grid w-full min-w-0 grid-cols-3 items-start gap-2 font-mono text-center sm:gap-4 md:w-auto md:flex md:shrink-0 md:flex-wrap md:items-center md:gap-6 md:text-right">
                       <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 block uppercase">Custo Receita</span>
-                        <span className="whitespace-nowrap text-sm font-bold text-slate-700">R$ {custo.toFixed(2)}</span>
+                        <span className="whitespace-nowrap text-sm font-bold text-slate-700">R$ {formatMoney(custo)}</span>
                       </div>
 
                       <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 block uppercase">Preço Venda</span>
-                        <span className="whitespace-nowrap text-sm font-bold text-brand-navy">R$ {f.precoVenda.toFixed(2)}</span>
+                        <span className="whitespace-nowrap text-sm font-bold text-brand-navy">R$ {formatMoney(f.precoVenda)}</span>
                       </div>
 
                       <div className="min-w-0 md:min-w-[70px]">
@@ -761,7 +762,7 @@ export const FichasTecnicas: React.FC = () => {
                 <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100 text-center">
                   <span className="text-[9px] uppercase text-slate-500 block font-bold">Margem de Contribuição</span>
                   <span className="text-base font-bold text-emerald-600 block font-mono mt-1">
-                    R$ {activeMargemR$.toFixed(2)}
+                    R$ {formatMoney(activeMargemR$)}
                   </span>
                   <span className="text-[10px] text-slate-400">({activeMargemPerc.toFixed(1)}%)</span>
                 </div>
@@ -828,7 +829,7 @@ export const FichasTecnicas: React.FC = () => {
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-500 font-medium">Preço Simulado de Venda:</span>
                     <span className="font-bold text-brand-navy font-mono">
-                      R$ {activePrecoFinal.toFixed(2)}
+                      R$ {formatMoney(activePrecoFinal)}
                     </span>
                   </div>
                   <input
@@ -849,7 +850,7 @@ export const FichasTecnicas: React.FC = () => {
                     Recomendação Inteligente:
                   </div>
                   <p className="text-slate-600 text-[11px] leading-relaxed">
-                    Para atingir sua meta de <strong className="text-slate-850">{user.metaFCP}% de CMV</strong>, o preço sugerido é de <strong className="text-brand-navy font-bold">R$ {precoSugerido.toFixed(2)}</strong>.
+                    Para atingir sua meta de <strong className="text-slate-850">{user.metaFCP}% de CMV</strong>, o preço sugerido é de <strong className="text-brand-navy font-bold">R$ {formatMoney(precoSugerido)}</strong>.
                   </p>
                 </div>
               </div>
@@ -874,7 +875,7 @@ export const FichasTecnicas: React.FC = () => {
                           </span>
                         </div>
                         <span className="font-mono font-bold text-slate-700">
-                          R$ {itemCusto.toFixed(2)}
+                          R$ {formatMoney(itemCusto)}
                         </span>
                       </div>
                     );
