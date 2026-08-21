@@ -42,6 +42,8 @@ export interface Movimentacao {
   custoTotal: number;
   data: string;
   observacao?: string;
+  estoqueAnterior?: number;
+  estoqueFinal?: number;
   setor?: SetorEstoque;
   unidade?: string;
 }

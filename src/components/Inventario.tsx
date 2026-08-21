@@ -77,11 +77,12 @@ export const Inventario: React.FC = () => {
       return;
     }
 
-    // Gravar o ajuste (positivo ou negativo)
+    // Gravar a contagem física; a diferença é calculada no contexto de estoque.
     addMovimentacao({
       insumoId: id,
       tipo: 'ajuste',
-      quantidade: discrepancia, // discrepância (ex: físico 8 - teórico 10 = -2)
+      quantidade: contagemVal,
+      estoqueFisico: contagemVal,
       custoUnitario: ins.custoMedio,
       observacao: `Ajuste inventário físico (Diferença: ${discrepancia > 0 ? '+' : ''}${discrepancia.toFixed(2)})`
     });

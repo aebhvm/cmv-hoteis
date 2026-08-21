@@ -148,6 +148,11 @@ export const Movimentacoes: React.FC = () => {
 
     // Validar se quantidade é suficiente para saídas/desperdícios
     const qty = Number(quantidade);
+    if (tipo === 'ajuste' && qty < 0) {
+      setErrorMsg('O estoque físico final não pode ser negativo.');
+      return;
+    }
+
     if (!editingMovId && tipo !== 'entrada' && tipo !== 'ajuste' && ins.estoqueAtual < qty) {
       setErrorMsg(`Estoque insuficiente! Estoque atual de ${ins.nome} é de ${ins.estoqueAtual} ${ins.unidadeMedida}.`);
       return;
@@ -160,7 +165,8 @@ export const Movimentacoes: React.FC = () => {
       quantidade: qty,
       custoUnitario: custoUnitario ? Number(custoUnitario) : undefined,
       observacao: observacao || undefined,
-      data: toMovementIso(dataMovimentacao, originalMov?.data)
+      data: toMovementIso(dataMovimentacao, originalMov?.data),
+      estoqueFisico: tipo === 'ajuste' ? qty : undefined
     };
 
     const result = editingMovId ? updateMovimentacao(editingMovId, payload) : (addMovimentacao(payload), { success: true });
@@ -205,13 +211,17 @@ export const Movimentacoes: React.FC = () => {
       setErrorMsg('Ajustes de estoque são exclusivos do Gestor.');
       return;
     }
+    const quantidadeEdicao = mov.tipo === 'ajuste'
+      ? mov.estoqueFinal ?? insumos.find(item => item.id === mov.insumoId)?.estoqueAtual ?? Math.max(0, mov.quantidade)
+      : mov.quantidade;
+
     setEditingMovId(id);
     setInsumoId(mov.insumoId);
     setInsumoSearchTerm(insumos.find(item => item.id === mov.insumoId)?.nome || mov.insumoNome);
     setSetorMovimentacao(getMovimentacaoSetor(mov));
     setShowInsumoSugestoes(false);
     setTipo(mov.tipo);
-    setQuantidade(mov.quantidade.toString());
+    setQuantidade(quantidadeEdicao.toString());
     setCustoUnitario(mov.custoUnitario?.toString() || '');
     setObservacao(mov.observacao || '');
     setErrorMsg('');
@@ -246,7 +256,10 @@ export const Movimentacoes: React.FC = () => {
   const filteredMovs = movimentacoes.filter(m => {
     const matchesSearch = m.insumoNome.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (m.observacao && m.observacao.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = selectedType === 'todos' || m.tipo === selectedType;
+    const matchesType = selectedType === 'todos'
+      || m.tipo === selectedType
+      || (selectedType === 'saida' && m.tipo === 'ajuste' && m.quantidade < 0)
+      || (selectedType === 'entrada' && m.tipo === 'ajuste' && m.quantidade > 0);
     const matchesDate = !selectedDate || toLocalDateKey(m.data) === selectedDate;
     const matchesSector = setorAtivo === 'Todos' || getMovimentacaoSetor(m) === setorAtivo;
     return matchesSearch && matchesType && matchesDate && matchesSector;
@@ -262,7 +275,7 @@ export const Movimentacoes: React.FC = () => {
 
   const movimentosDaData = filteredMovs;
   const totalEntradasR$ = movimentosDaData
-    .filter(m => m.tipo === 'entrada')
+    .filter(m => m.tipo === 'entrada' || (m.tipo === 'ajuste' && m.quantidade > 0))
     .reduce((acc, m) => acc + m.custoTotal, 0);
 
   const totalDesperdicioR$ = movimentosDaData
@@ -276,7 +289,14 @@ export const Movimentacoes: React.FC = () => {
   const totalSelecionadoR$ = movimentosDaData.reduce((acc, m) => acc + m.custoTotal, 0);
   const totalResumoPrincipalR$ = selectedType === 'todos' ? totalEntradasR$ : totalSelecionadoR$;
 
-  const getTipoEstilo = (tipo: string) => {
+  const getTipoEstilo = (mov: Movimentacao) => {
+    if (mov.tipo === 'ajuste' && mov.quantidade < 0) {
+      return { text: 'Saída de ajuste', bg: 'bg-rose-50 text-rose-700 border border-rose-200/60 font-bold' };
+    }
+    if (mov.tipo === 'ajuste' && mov.quantidade > 0) {
+      return { text: 'Entrada de ajuste', bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' };
+    }
+    const tipo = mov.tipo;
       <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="Setor das movimentações">
         {SETOR_TABS.map(setor => (
           <button
@@ -306,10 +326,10 @@ export const Movimentacoes: React.FC = () => {
     }
   };
 
-  const getSinalSufixo = (tipo: string) => {
-    if (tipo === 'entrada') return '+';
-    if (tipo === 'saida' || tipo === 'desperdicio') return '-';
-    return ''; // ajuste pode ser qualquer um
+  const getSinalSufixo = (mov: Movimentacao) => {
+    if (mov.tipo === 'entrada' || (mov.tipo === 'ajuste' && mov.quantidade > 0)) return '+';
+    if (mov.tipo === 'saida' || mov.tipo === 'desperdicio') return '-';
+    return '';
   };
 
   return (
@@ -544,7 +564,9 @@ export const Movimentacoes: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Quantidade *</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  {tipo === 'ajuste' ? 'Estoque físico final *' : 'Quantidade *'}
+                </label>
                 <div className="relative">
                   <input
                     type="number"
@@ -553,6 +575,7 @@ export const Movimentacoes: React.FC = () => {
                     onChange={(e) => setQuantidade(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                     placeholder="ex: 2.5"
+                    min={tipo === 'ajuste' ? 0 : undefined}
                     required
                   />
                   {insumoId && (
@@ -561,6 +584,11 @@ export const Movimentacoes: React.FC = () => {
                     </span>
                   )}
                 </div>
+                {tipo === 'ajuste' && insumoId && (
+                  <span className="mt-1 block text-[9px] font-medium text-slate-400">
+                    Estoque teórico atual: {insumos.find(i => i.id === insumoId)?.estoqueAtual ?? 0}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -718,9 +746,9 @@ export const Movimentacoes: React.FC = () => {
                   const dataFormatada = dataObj.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE });
                   const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
                   
-                  const estiloBadge = getTipoEstilo(m.tipo);
+                  const estiloBadge = getTipoEstilo(m);
                   const ins = insumos.find(i => i.id === m.insumoId);
-                  const sinal = getSinalSufixo(m.tipo);
+                  const sinal = getSinalSufixo(m);
 
                   return (
                     <tr key={m.id} className="hover:bg-slate-50/30 transition-colors">
@@ -741,7 +769,7 @@ export const Movimentacoes: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-medium">
-                        <span className={m.tipo === 'desperdicio' ? 'text-rose-600 font-semibold' : m.tipo === 'entrada' ? 'text-emerald-600 font-semibold' : 'text-slate-700'}>
+                        <span className={m.tipo === 'desperdicio' || (m.tipo === 'ajuste' && m.quantidade < 0) ? 'text-rose-600 font-semibold' : m.tipo === 'entrada' || (m.tipo === 'ajuste' && m.quantidade > 0) ? 'text-emerald-600 font-semibold' : 'text-slate-700'}>
                           {sinal}{m.quantidade.toFixed(2)}
                         </span>{' '}
                         <span className="text-[10px] text-slate-400 uppercase">{ins?.unidadeMedida || ''}</span>

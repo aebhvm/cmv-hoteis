@@ -35,6 +35,7 @@ interface StockContextType {
     custoUnitario?: number;
     observacao?: string;
     data?: string;
+    estoqueFisico?: number;
   }) => void;
   updateMovimentacao: (id: string, mov: {
     insumoId: string;
@@ -43,6 +44,7 @@ interface StockContextType {
     custoUnitario?: number;
     observacao?: string;
     data?: string;
+    estoqueFisico?: number;
   }) => { success: boolean; error?: string };
   deleteMovimentacao: (id: string) => { success: boolean; error?: string };
   addFicha: (ficha: Omit<FichaTecnica, 'id'>) => void;
@@ -566,13 +568,21 @@ useEffect(() => {
     custoUnitario?: number;
     observacao?: string;
     data?: string;
+    estoqueFisico?: number;
   }) => {
     const insumo = allInsumos.find(i => i.id === movData.insumoId);
     if (!insumo) return;
 
     const qty = Number(movData.quantidade);
     const costUnit = movData.custoUnitario !== undefined ? Number(movData.custoUnitario) : insumo.custoMedio;
-    const totalCost = Number((qty * costUnit).toFixed(2));
+    const estoqueAnterior = insumo.estoqueAtual;
+    const estoqueFinal = movData.tipo === 'ajuste'
+      ? Math.max(0, Number(movData.estoqueFisico ?? (estoqueAnterior + qty)))
+      : undefined;
+    const quantidadeMovimentada = movData.tipo === 'ajuste'
+      ? Number(((estoqueFinal ?? estoqueAnterior) - estoqueAnterior).toFixed(5))
+      : qty;
+    const totalCost = Number((Math.abs(quantidadeMovimentada) * costUnit).toFixed(2));
 
     let novoEstoque = insumo.estoqueAtual;
     let novoCustoMedio = insumo.custoMedio;
@@ -589,12 +599,7 @@ useEffect(() => {
     } else if (movData.tipo === 'saida' || movData.tipo === 'desperdicio') {
       novoEstoque = Math.max(0, insumo.estoqueAtual - qty);
     } else if (movData.tipo === 'ajuste') {
-      novoEstoque = Math.max(0, insumo.estoqueAtual + qty);
-      if (qty > 0 && movData.custoUnitario !== undefined) {
-        const valorEstoqueAntigo = insumo.estoqueAtual * insumo.custoMedio;
-        const valorAjusteNovo = qty * costUnit;
-        novoCustoMedio = Number(((valorEstoqueAntigo + valorAjusteNovo) / novoEstoque).toFixed(2));
-      }
+      novoEstoque = estoqueFinal ?? estoqueAnterior;
     }
 
     setAllInsumos(prev => prev.map(ins => {
@@ -609,11 +614,13 @@ useEffect(() => {
       insumoId: movData.insumoId,
       insumoNome: insumo.nome,
       tipo: movData.tipo,
-      quantidade: qty,
+      quantidade: quantidadeMovimentada,
       custoUnitario: costUnit,
       custoTotal: totalCost,
       data: movData.data || new Date().toISOString(),
       observacao: movData.observacao || '',
+      estoqueAnterior: movData.tipo === 'ajuste' ? estoqueAnterior : undefined,
+      estoqueFinal: movData.tipo === 'ajuste' ? novoEstoque : undefined,
       setor: getInsumoSetor(insumo),
       unidade: currentUnit
     };
@@ -634,6 +641,7 @@ useEffect(() => {
     custoUnitario?: number;
     observacao?: string;
     data?: string;
+    estoqueFisico?: number;
   }) => {
     const original = allMovimentacoes.find(m => m.id === id);
     const insumoNovo = allInsumos.find(i => i.id === movData.insumoId);
@@ -641,17 +649,32 @@ useEffect(() => {
 
     const qty = Number(movData.quantidade);
     const costUnit = movData.custoUnitario !== undefined ? Number(movData.custoUnitario) : insumoNovo.custoMedio;
+    const mesmoInsumo = original.insumoId === movData.insumoId;
+    const estoqueSemMovimentoOriginal = mesmoInsumo
+      ? insumoNovo.estoqueAtual + getMovimentoEstoqueDelta(original, true)
+      : insumoNovo.estoqueAtual;
+    const estoqueAntesDoAjuste = mesmoInsumo && original.tipo === 'ajuste'
+      ? Number(original.estoqueAnterior ?? (insumoNovo.estoqueAtual - original.quantidade))
+      : estoqueSemMovimentoOriginal;
+    const estoqueFinalAjustado = movData.tipo === 'ajuste'
+      ? Math.max(0, Number(movData.estoqueFisico ?? (estoqueAntesDoAjuste + qty)))
+      : undefined;
+    const quantidadeAtualizada = movData.tipo === 'ajuste'
+      ? Number(((estoqueFinalAjustado ?? estoqueAntesDoAjuste) - estoqueAntesDoAjuste).toFixed(5))
+      : qty;
     const updatedMov: Movimentacao = {
       ...original,
       insumoId: movData.insumoId,
       insumoNome: insumoNovo.nome,
       tipo: movData.tipo,
-      quantidade: qty,
+      quantidade: quantidadeAtualizada,
       custoUnitario: costUnit,
-      custoTotal: Number((qty * costUnit).toFixed(2)),
+      custoTotal: Number((Math.abs(quantidadeAtualizada) * costUnit).toFixed(2)),
       data: movData.data || original.data,
       observacao: movData.observacao || '',
-      setor: getInsumoSetor(insumoNovo)
+      setor: getInsumoSetor(insumoNovo),
+      estoqueAnterior: movData.tipo === 'ajuste' ? estoqueAntesDoAjuste : undefined,
+      estoqueFinal: movData.tipo === 'ajuste' ? estoqueFinalAjustado : undefined,
     };
 
     const estoquePrevisto = allInsumos.map(ins => {
