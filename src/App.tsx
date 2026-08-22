@@ -10,6 +10,7 @@ import { Inventario } from './components/Inventario';
 import { Utensilios } from './components/Utensilios';
 import { Vendas } from './components/Vendas';
 import { Relatorios } from './components/Relatorios';
+import { RelatoriosGestores } from './components/RelatoriosGestores';
 import { Usuarios } from './components/Usuarios';
 import { 
   LayoutDashboard, 
@@ -27,6 +28,7 @@ import {
   Menu, 
   X,
   Target,
+  ClipboardList,
   Moon,
   Sun
 } from 'lucide-react';
@@ -37,7 +39,7 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('chef_dark_mode') === 'true');
   
-  const { user, insumos, currentUnit, setCurrentUnit } = useStock();
+  const { user, insumos, currentUnit, setCurrentUnit, relatoriosPendentes } = useStock();
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
@@ -58,6 +60,7 @@ function AppContent() {
     { id: 'inventario', label: 'Inventário / Auditoria', icon: ClipboardCheck },
     { id: 'vendas', label: 'Faturamento / PDV', icon: ShoppingCart },
     { id: 'relatorios', label: 'Relatórios & Simulações', icon: BarChart4 },
+    { id: 'relatorios-gestores', label: 'Relatórios dos Gestores', icon: ClipboardList },
     { id: 'usuarios', label: 'Usuários', icon: User },
   ];
 
@@ -115,6 +118,9 @@ function AppContent() {
       case 'relatorios':
         if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <Relatorios />;
+      case 'relatorios-gestores':
+        if (user.cargo === 'Colaborador') return <Movimentacoes />;
+        return <RelatoriosGestores />;
       case 'usuarios':
         if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <Usuarios />;
@@ -230,6 +236,13 @@ function AppContent() {
                     isSelected ? 'bg-rose-100 text-rose-700' : 'bg-rose-50 text-rose-700 border border-rose-100/50'
                   }`}>
                     {alertasAtivos}
+                  </span>
+                )}
+                {tab.id === 'relatorios-gestores' && relatoriosPendentes.length > 0 && (
+                  <span className={`ml-auto px-1.5 py-0.5 rounded text-[9px] font-black ${
+                    isSelected ? 'bg-amber-100 text-amber-800' : 'bg-amber-50 text-amber-800 border border-amber-100/50'
+                  }`} aria-label={`${relatoriosPendentes.length} relatório(s) pendente(s)`}>
+                    {relatoriosPendentes.length}
                   </span>
                 )}
               </button>

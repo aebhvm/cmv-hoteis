@@ -39,6 +39,7 @@ const initialState = {
   allVendas: [],
   allUtensilios: [],
   allMovimentacoesUtensilios: [],
+  allRelatorios: [],
 };
 
 const getSql = () => {
@@ -80,7 +81,7 @@ const normalizeState = (state: any) => {
   };
 };
 
-const collectionKeys = ['users', 'allInsumos', 'allFichas', 'allMovimentacoes', 'allVendas', 'allUtensilios', 'allMovimentacoesUtensilios'] as const;
+const collectionKeys = ['users', 'allInsumos', 'allFichas', 'allMovimentacoes', 'allVendas', 'allUtensilios', 'allMovimentacoesUtensilios', 'allRelatorios'] as const;
 
 const isPlainObject = (value: unknown): value is Record<string, any> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -99,13 +100,38 @@ const isValidCollectionPatch = (value: unknown) => {
     && deleted.every(item => typeof item === 'string' && item.length <= 200);
 };
 
+const isValidReport = (value: Record<string, any>) => {
+  if (typeof value.id !== 'string' || value.id.length > 200) return false;
+  if (typeof value.titulo !== 'string' || value.titulo.length > 200) return false;
+  if (typeof value.texto !== 'string' || value.texto.length > 20_000) return false;
+  if (typeof value.autorId !== 'string' || typeof value.autorNome !== 'string' || typeof value.autorEmail !== 'string') return false;
+  if (typeof value.criadoEm !== 'string' || typeof value.unidade !== 'string') return false;
+  if (!Array.isArray(value.visualizadoPor) || value.visualizadoPor.some((item: unknown) => typeof item !== 'string' || item.length > 200)) return false;
+  if (!Array.isArray(value.anexos) || value.anexos.length > 8) return false;
+  return value.anexos.every((attachment: any) => (
+    attachment && typeof attachment === 'object'
+      && typeof attachment.id === 'string'
+      && typeof attachment.nome === 'string'
+      && ['audio', 'imagem', 'video'].includes(attachment.tipo)
+      && typeof attachment.mimeType === 'string'
+      && typeof attachment.tamanho === 'number'
+      && Number.isFinite(attachment.tamanho)
+      && typeof attachment.dataUrl === 'string'
+      && attachment.dataUrl.length <= 1_500_000
+  ));
+};
+
 const isValidPatch = (value: unknown) => {
   if (!isPlainObject(value)) return false;
   const allowedKeys = new Set(['currentUnit', 'user', ...collectionKeys]);
   if (Object.keys(value).some(key => !allowedKeys.has(key))) return false;
   if (value.currentUnit !== undefined && value.currentUnit !== 'AeB Villa Mayor' && value.currentUnit !== 'VM Cumbuco') return false;
   if (value.user !== undefined && !isPlainObject(value.user)) return false;
-  return collectionKeys.every(key => value[key] === undefined || isValidCollectionPatch(value[key]));
+  return collectionKeys.every(key => {
+    if (value[key] === undefined) return true;
+    if (key !== 'allRelatorios') return isValidCollectionPatch(value[key]);
+    return isValidCollectionPatch(value[key]) && (value[key].upserts || []).every(isValidReport);
+  });
 };
 
 const getEntityKey = (item: any) => String(item?.id || item?.email || '');

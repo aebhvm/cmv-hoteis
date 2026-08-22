@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile, Utensilio, MovimentacaoUtensilio, SetorEstoque } from '../types';
+import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile, Utensilio, MovimentacaoUtensilio, SetorEstoque, RelatorioGestor } from '../types';
 import {
   INITIAL_USER,
   INITIAL_INSUMOS,
@@ -18,6 +18,8 @@ interface StockContextType {
   vendas: VendaLog[];
   utensilios: Utensilio[];
   movimentacoesUtensilios: MovimentacaoUtensilio[];
+  relatorios: RelatorioGestor[];
+  relatoriosPendentes: RelatorioGestor[];
   updateUser: (profile: Partial<UserProfile>) => void;
   addUtensilio: (utensilio: Omit<Utensilio, 'id' | 'unidade' | 'perdasAcumuladas' | 'quantidadeContada' | 'dataUltimaContagem'>) => void;
   updateUtensilio: (id: string, utensilio: Partial<Utensilio>) => void;
@@ -61,6 +63,8 @@ interface StockContextType {
   users: Array<UserProfile & { senha?: string }>;
   registerUser: (newUser: UserProfile & { senha?: string }) => void;
   deleteUser: (email: string) => void;
+  addRelatorio: (report: Pick<RelatorioGestor, 'titulo' | 'texto' | 'anexos'>) => { success: boolean; error?: string };
+  marcarRelatorioVerificado: (id: string) => { success: boolean; error?: string };
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -92,6 +96,7 @@ type AppStateSnapshot = {
   allVendas: VendaLog[];
   allUtensilios: Utensilio[];
   allMovimentacoesUtensilios: MovimentacaoUtensilio[];
+  allRelatorios: RelatorioGestor[];
 };
 
 const DEFAULT_USERS: Array<UserProfile & { senha?: string }> = [
@@ -156,7 +161,8 @@ const buildInitialCollections = () => {
     allMovimentacoes: [...villaMayorMovs, ...cumbucoMovs],
     allVendas: [...villaMayorVendas, ...cumbucoVendas],
     allUtensilios: [],
-    allMovimentacoesUtensilios: []
+    allMovimentacoesUtensilios: [],
+    allRelatorios: []
   };
 };
 
@@ -216,6 +222,7 @@ type StatePatch = Partial<Pick<AppStateSnapshot, 'currentUnit' | 'user'>> & {
   allVendas?: CollectionPatch;
   allUtensilios?: CollectionPatch;
   allMovimentacoesUtensilios?: CollectionPatch;
+  allRelatorios?: CollectionPatch;
 };
 
 const statesMatch = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
@@ -237,6 +244,7 @@ const buildStatePatch = (base: AppStateSnapshot, next: AppStateSnapshot): StateP
   const allVendas = buildCollectionPatch(base.allVendas, next.allVendas);
   const allUtensilios = buildCollectionPatch(base.allUtensilios, next.allUtensilios);
   const allMovimentacoesUtensilios = buildCollectionPatch(base.allMovimentacoesUtensilios, next.allMovimentacoesUtensilios);
+  const allRelatorios = buildCollectionPatch(base.allRelatorios, next.allRelatorios);
   return {
     ...(statesMatch(base.currentUnit, next.currentUnit) ? {} : { currentUnit: next.currentUnit }),
     ...(statesMatch(base.user, next.user) ? {} : { user: next.user }),
@@ -247,6 +255,7 @@ const buildStatePatch = (base: AppStateSnapshot, next: AppStateSnapshot): StateP
     ...(allVendas ? { allVendas } : {}),
     ...(allUtensilios ? { allUtensilios } : {}),
     ...(allMovimentacoesUtensilios ? { allMovimentacoesUtensilios } : {}),
+    ...(allRelatorios ? { allRelatorios } : {}),
   };
 };
 
@@ -262,6 +271,7 @@ const snapshotFromRemote = (state: any): AppStateSnapshot => ({
   allVendas: state.allVendas || [],
   allUtensilios: state.allUtensilios || [],
   allMovimentacoesUtensilios: state.allMovimentacoesUtensilios || [],
+  allRelatorios: state.allRelatorios || [],
 });
 
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -335,6 +345,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     readJsonStorage<MovimentacaoUtensilio[]>('chef_all_movimentacoes_utensilios', initialCollections.allMovimentacoesUtensilios)
   );
 
+  const [allRelatorios, setAllRelatorios] = useState<RelatorioGestor[]>(() =>
+    readJsonStorage<RelatorioGestor[]>('chef_all_relatorios', initialCollections.allRelatorios)
+  );
+
   // Persist master states
   useEffect(() => {
     localStorage.setItem('chef_current_unit', currentUnit);
@@ -374,6 +388,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('chef_all_movimentacoes_utensilios', JSON.stringify(allMovimentacoesUtensilios));
   }, [allMovimentacoesUtensilios]);
 
+  useEffect(() => {
+    localStorage.setItem('chef_all_relatorios', JSON.stringify(allRelatorios));
+  }, [allRelatorios]);
+
 
   const buildSnapshot = (): AppStateSnapshot => ({
     currentUnit,
@@ -384,7 +402,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     allMovimentacoes,
     allVendas,
     allUtensilios,
-    allMovimentacoesUtensilios
+    allMovimentacoesUtensilios,
+    allRelatorios
   });
 
 useEffect(() => {
@@ -411,6 +430,7 @@ useEffect(() => {
         if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
         if (Array.isArray(data.allUtensilios)) setAllUtensilios(data.allUtensilios);
         if (Array.isArray(data.allMovimentacoesUtensilios)) setAllMovimentacoesUtensilios(data.allMovimentacoesUtensilios);
+        if (Array.isArray(data.allRelatorios)) setAllRelatorios(data.allRelatorios);
         remoteStateReadyRef.current = true;
       })
       .catch(() => {
@@ -424,7 +444,7 @@ useEffect(() => {
 
   useEffect(() => {
     latestSnapshotRef.current = buildSnapshot();
-  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios]);
+  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios, allRelatorios]);
 
   useEffect(() => {
     if (!remoteStateReadyRef.current) return;
@@ -483,7 +503,7 @@ useEffect(() => {
     }, 100);
 
     return () => window.clearTimeout(timer);
-  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios]);
+  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios, allRelatorios]);
 
   // Derived filtered state for current unit
   const insumos = allInsumos.filter(i => i.unidade === currentUnit);
@@ -492,9 +512,51 @@ useEffect(() => {
   const vendas = allVendas.filter(v => v.unidade === currentUnit);
   const utensilios = allUtensilios.filter(u => u.unidade === currentUnit);
   const movimentacoesUtensilios = allMovimentacoesUtensilios.filter(m => m.unidade === currentUnit);
+  const relatorios = allRelatorios.filter(report => report.unidade === currentUnit);
+  const viewerKey = user.id || user.email;
+  const relatoriosPendentes = relatorios.filter(report => (
+    report.autorId !== viewerKey && !report.visualizadoPor.includes(viewerKey)
+  ));
 
   const setCurrentUnit = (unit: 'AeB Villa Mayor' | 'VM Cumbuco') => {
     setCurrentUnitState(unit);
+  };
+
+  const addRelatorio = (report: Pick<RelatorioGestor, 'titulo' | 'texto' | 'anexos'>) => {
+    if (user.cargo === 'Colaborador') return { success: false, error: 'Apenas gestores podem enviar relatórios.' };
+    if (!report.titulo.trim() || !report.texto.trim()) return { success: false, error: 'Informe o título e o relato escrito.' };
+    if (report.anexos.length > 8) return { success: false, error: 'Adicione no máximo 8 arquivos por relatório.' };
+    if (report.anexos.some(attachment => attachment.dataUrl.length > 1_500_000)) {
+      return { success: false, error: 'Um dos anexos ultrapassa o limite permitido.' };
+    }
+
+    const newReport: RelatorioGestor = {
+      id: `rel-${Date.now()}`,
+      titulo: report.titulo.trim(),
+      texto: report.texto.trim(),
+      anexos: report.anexos,
+      autorId: viewerKey,
+      autorNome: user.nome,
+      autorEmail: user.email,
+      criadoEm: new Date().toISOString(),
+      unidade: currentUnit,
+      visualizadoPor: []
+    };
+    setAllRelatorios(previous => [newReport, ...previous]);
+    return { success: true };
+  };
+
+  const marcarRelatorioVerificado = (id: string) => {
+    if (user.cargo === 'Colaborador') return { success: false, error: 'Apenas gestores podem verificar relatórios.' };
+    const report = allRelatorios.find(item => item.id === id && item.unidade === currentUnit);
+    if (!report) return { success: false, error: 'Relatório não encontrado.' };
+    if (report.visualizadoPor.includes(viewerKey)) return { success: true };
+    setAllRelatorios(previous => previous.map(item => (
+      item.id === id
+        ? { ...item, visualizadoPor: [...new Set([...item.visualizadoPor, viewerKey])] }
+        : item
+    )));
+    return { success: true };
   };
 
   const updateUser = (profile: Partial<UserProfile>) => {
@@ -1113,6 +1175,7 @@ useEffect(() => {
     setAllVendas(fresh.allVendas);
     setAllUtensilios(fresh.allUtensilios);
     setAllMovimentacoesUtensilios(fresh.allMovimentacoesUtensilios);
+    setAllRelatorios(fresh.allRelatorios);
 
     localStorage.removeItem('chef_user');
     localStorage.removeItem('chef_registered_users');
@@ -1122,6 +1185,7 @@ useEffect(() => {
     localStorage.removeItem('chef_all_vendas');
     localStorage.removeItem('chef_all_utensilios');
     localStorage.removeItem('chef_all_movimentacoes_utensilios');
+    localStorage.removeItem('chef_all_relatorios');
   };
 
   const exportarDados = () => JSON.stringify(buildSnapshot(), null, 2);
@@ -1168,6 +1232,12 @@ useEffect(() => {
       } else if (Array.isArray(data.movimentacoesUtensilios)) {
         setAllMovimentacoesUtensilios(prev => [...prev.filter(item => item.unidade !== currentUnit), ...data.movimentacoesUtensilios.map((item: MovimentacaoUtensilio) => ({ ...item, unidade: currentUnit }))]);
       }
+
+      if (Array.isArray(data.allRelatorios)) {
+        setAllRelatorios(data.allRelatorios);
+      } else if (Array.isArray(data.relatorios)) {
+        setAllRelatorios(prev => [...prev.filter(item => item.unidade !== currentUnit), ...data.relatorios.map((item: RelatorioGestor) => ({ ...item, unidade: currentUnit }))]);
+      }
       return true;
     } catch (e) {
       console.error(e);
@@ -1186,6 +1256,8 @@ useEffect(() => {
       vendas,
       utensilios,
       movimentacoesUtensilios,
+      relatorios,
+      relatoriosPendentes,
       updateUser,
       addUtensilio,
       updateUtensilio,
@@ -1212,7 +1284,9 @@ useEffect(() => {
       exportarDados,
       users,
       registerUser,
-      deleteUser
+      deleteUser,
+      addRelatorio,
+      marcarRelatorioVerificado
     }}>
       {children}
     </StockContext.Provider>
