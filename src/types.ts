@@ -93,27 +93,3 @@ export interface MovimentacaoUtensilio {
   observacao?: string;
   unidade?: string;
 }
-
-export type RelatorioAnexoTipo = 'audio' | 'imagem' | 'video';
-
-export interface RelatorioAnexo {
-  id: string;
-  nome: string;
-  tipo: RelatorioAnexoTipo;
-  mimeType: string;
-  tamanho: number;
-  dataUrl: string;
-}
-
-export interface RelatorioGestor {
-  id: string;
-  titulo: string;
-  texto: string;
-  anexos: RelatorioAnexo[];
-  autorId: string;
-  autorNome: string;
-  autorEmail: string;
-  criadoEm: string;
-  unidade: string;
-  visualizadoPor: string[];
-}
