@@ -910,88 +910,173 @@ useEffect(() => {
     setAllFichas(prev => prev.filter(fic => fic.id !== id));
   };
 
-  // Registrar venda simula o faturamento e decrementa insumos de forma explosiva
-  const registrarVenda = (fichaId: string, quantidade: number) => {
-    const qty = Number(quantidade);
-    const f = fichas.find(fic => fic.id === fichaId);
-    if (!f) return { success: false, error: 'Ficha técnica não encontrada.' };
+  const normalizeInsumoNome = (nome: string) => nome
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 
-    // Validar se há estoque suficiente de todos os ingredientes envolvidos
-    const ingredientesFaltando: string[] = [];
-    f.ingredientes.forEach(ing => {
-      const ins = allInsumos.find(i => i.id === ing.insumoId);
-      const totalNecessario = (ing.quantidade / (f.rendimentoPorcoes || 1)) * qty;
-      if (!ins || ins.estoqueAtual < totalNecessario) {
-        ingredientesFaltando.push(ins ? ins.nome : 'Insumo desconhecido');
+  const getMovimentosDaVenda = (saleId: string) => allMovimentacoes.filter(mov =>
+    (!mov.unidade || mov.unidade === currentUnit) &&
+    (mov.id.startsWith(`${saleId}-`) || mov.observacao?.includes(`[venda:${saleId}]`))
+  );
+
+  const buildVendaMovimentos = (
+    ficha: FichaTecnica,
+    qty: number,
+    saleId: string,
+    estoqueInicial: Insumo[] = allInsumos
+  ) => {
+    const estoqueFinal = new Map(estoqueInicial.map(insumo => [insumo.id, insumo.estoqueAtual]));
+    const necessidades = new Map<string, {
+      nome: string;
+      unidadeMedida: Insumo['unidadeMedida'];
+      quantidade: number;
+    }>();
+    const ingredientesSemCadastro: string[] = [];
+
+    ficha.ingredientes.forEach(ingrediente => {
+      const insumoReferencia = estoqueInicial.find(insumo => insumo.id === ingrediente.insumoId);
+      if (!insumoReferencia) {
+        ingredientesSemCadastro.push(ingrediente.insumoId);
+        return;
+      }
+
+      const quantidade = (ingrediente.quantidade / (ficha.rendimentoPorcoes || 1)) * qty;
+      const key = `${normalizeInsumoNome(insumoReferencia.nome)}::${insumoReferencia.unidadeMedida}`;
+      const existente = necessidades.get(key);
+      necessidades.set(key, {
+        nome: insumoReferencia.nome,
+        unidadeMedida: insumoReferencia.unidadeMedida,
+        quantidade: (existente?.quantidade || 0) + quantidade
+      });
+    });
+
+    if (ingredientesSemCadastro.length > 0) {
+      return { success: false as const, error: 'A ficha possui insumo excluído ou não cadastrado.' };
+    }
+
+    const faltando: string[] = [];
+    const movimentosPorInsumo = new Map<string, Movimentacao>();
+
+    necessidades.forEach(necessidade => {
+      const nomeNormalizado = normalizeInsumoNome(necessidade.nome);
+      const candidatos = estoqueInicial.filter(insumo =>
+        insumo.unidade === currentUnit &&
+        insumo.unidadeMedida === necessidade.unidadeMedida &&
+        normalizeInsumoNome(insumo.nome) === nomeNormalizado &&
+        (estoqueFinal.get(insumo.id) || 0) > 0
+      );
+      const disponivel = candidatos.reduce(
+        (total, insumo) => total + (estoqueFinal.get(insumo.id) || 0),
+        0
+      );
+
+      if (disponivel + 1e-8 < necessidade.quantidade) {
+        faltando.push(
+          `${necessidade.nome} (necessário ${necessidade.quantidade.toFixed(3)}, disponível ${disponivel.toFixed(3)})`
+        );
+        return;
+      }
+
+      let restante = necessidade.quantidade;
+      candidatos.forEach((insumo, index) => {
+        if (restante <= 1e-8) return;
+
+        const saldo = estoqueFinal.get(insumo.id) || 0;
+        const retiradaCalculada = index === candidatos.length - 1
+          ? restante
+          : necessidade.quantidade * (saldo / disponivel);
+        const retirada = Math.min(saldo, retiradaCalculada);
+        if (retirada <= 1e-8) return;
+
+        estoqueFinal.set(insumo.id, Math.max(0, saldo - retirada));
+        restante -= retirada;
+
+        const movimentoExistente = movimentosPorInsumo.get(insumo.id);
+        const quantidadeTotal = (movimentoExistente?.quantidade || 0) + retirada;
+        movimentosPorInsumo.set(insumo.id, {
+          id: `${saleId}-${insumo.id}`,
+          insumoId: insumo.id,
+          insumoNome: insumo.nome,
+          tipo: 'saida',
+          quantidade: quantidadeTotal,
+          custoUnitario: getInsumoUnitCost(insumo),
+          custoTotal: Number(getInsumoQuantityCost(insumo, quantidadeTotal).toFixed(2)),
+          data: new Date().toISOString(),
+          observacao: `Consumo venda: ${qty}x ${ficha.nome} [venda:${saleId}]`,
+          setor: getInsumoSetor(insumo),
+          unidade: currentUnit
+        });
+      });
+
+      if (restante > 1e-6) {
+        faltando.push(`${necessidade.nome} (saldo combinado insuficiente)`);
       }
     });
 
-    if (ingredientesFaltando.length > 0) {
-      return {
-        success: false,
-        error: `Estoque insuficiente para os seguintes insumos: ${ingredientesFaltando.join(', ')}.`
-      };
+    if (faltando.length > 0) {
+      return { success: false as const, error: `Estoque insuficiente para: ${faltando.join(', ')}.` };
+    }
+
+    const movimentos = Array.from(movimentosPorInsumo.values());
+    const custoTotalInsumos = Number(
+      movimentos.reduce((total, movimento) => total + movimento.custoTotal, 0).toFixed(2)
+    );
+    return { success: true as const, estoqueFinal, movimentos, custoTotalInsumos };
+  };
+
+  const getEstoqueComVendaRestaurada = (venda: VendaLog) => {
+    const estoqueRestaurado = allInsumos.map(insumo => ({ ...insumo }));
+    const movimentos = getMovimentosDaVenda(venda.id);
+
+    if (movimentos.length > 0) {
+      movimentos.forEach(movimento => {
+        const insumo = estoqueRestaurado.find(item => item.id === movimento.insumoId);
+        if (insumo) insumo.estoqueAtual += movimento.quantidade;
+      });
+      return estoqueRestaurado;
+    }
+
+    const ficha = allFichas.find(item => item.id === venda.fichaId);
+    ficha?.ingredientes.forEach(ingrediente => {
+      const insumo = estoqueRestaurado.find(item => item.id === ingrediente.insumoId);
+      if (insumo) {
+        insumo.estoqueAtual +=
+          (ingrediente.quantidade / (ficha.rendimentoPorcoes || 1)) * venda.quantidade;
+      }
+    });
+    return estoqueRestaurado;
+  };
+
+  // O faturamento usa o saldo combinado do mesmo insumo nos dois setores.
+  const registrarVenda = (fichaId: string, quantidade: number) => {
+    const qty = Number(quantidade);
+    const ficha = fichas.find(item => item.id === fichaId);
+    if (!ficha) return { success: false, error: 'Ficha técnica não encontrada.' };
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { success: false, error: 'Informe uma quantidade válida.' };
     }
 
     const saleId = `ven-${Date.now()}`;
+    const resultado = buildVendaMovimentos(ficha, qty, saleId);
+    if (!resultado.success) return resultado;
 
-    // Calcular o custo real dos ingredientes consumidos nesta venda
-    let custoTotalInsumos = 0;
-    const batchUpdates = new Map<string, number>();
-    const newMovs: Movimentacao[] = [];
+    setAllInsumos(prev => prev.map(insumo => ({
+      ...insumo,
+      estoqueAtual: resultado.estoqueFinal.get(insumo.id) ?? insumo.estoqueAtual
+    })));
+    setAllMovimentacoes(prev => [...resultado.movimentos, ...prev]);
 
-    // Decrementar estoque de cada ingrediente e calcular custo
-    f.ingredientes.forEach(ing => {
-      const quantConsumida = (ing.quantidade / (f.rendimentoPorcoes || 1)) * qty;
-      const ins = allInsumos.find(i => i.id === ing.insumoId);
-      if (ins) {
-        custoTotalInsumos += getInsumoQuantityCost(ins, quantConsumida);
-
-        // Deduzir o estoque do ingrediente
-        const novoEstoque = Math.max(0, ins.estoqueAtual - quantConsumida);
-        batchUpdates.set(ing.insumoId, novoEstoque);
-
-        // Registrar saída correspondente no histórico de movimentações
-        const novaMov: Movimentacao = {
-          id: `${saleId}-${ing.insumoId}`,
-          insumoId: ing.insumoId,
-          insumoNome: ins.nome,
-          tipo: 'saida',
-          quantidade: quantConsumida,
-          custoUnitario: getInsumoUnitCost(ins),
-          custoTotal: Number(getInsumoQuantityCost(ins, quantConsumida).toFixed(2)),
-          data: new Date().toISOString(),
-          observacao: `Consumo venda: ${qty}x ${f.nome} [venda:${saleId}]`,
-          setor: getInsumoSetor(ins),
-          unidade: currentUnit
-        };
-        newMovs.push(novaMov);
-      }
-    });
-
-    // Bulk update insumos
-    setAllInsumos(prev => prev.map(ins => {
-      if (batchUpdates.has(ins.id)) {
-        return { ...ins, estoqueAtual: batchUpdates.get(ins.id)! };
-      }
-      return ins;
-    }));
-
-    // Add new movements
-    setAllMovimentacoes(prev => [...newMovs, ...prev]);
-
-    const receitaTotal = Number((qty * f.precoVenda).toFixed(2));
-    const custoInsumosTotal = Number(custoTotalInsumos.toFixed(2));
-
-    // Registrar o log de venda
     const novaVenda: VendaLog = {
       id: saleId,
       fichaId,
-      fichaNome: f.nome,
+      fichaNome: ficha.nome,
       quantidade: qty,
-      precoVendaUnitario: f.precoVenda,
-      receitaTotal,
-      custoInsumosTotal,
+      precoVendaUnitario: ficha.precoVenda,
+      receitaTotal: Number((qty * ficha.precoVenda).toFixed(2)),
+      custoInsumosTotal: resultado.custoTotalInsumos,
       data: new Date().toISOString(),
       unidade: currentUnit
     };
@@ -1000,109 +1085,68 @@ useEffect(() => {
     return { success: true };
   };
 
-  const buildVendaMovimentos = (f: FichaTecnica, qty: number, saleId: string) => {
-    let custoTotalInsumos = 0;
-    const movimentos: Movimentacao[] = [];
-
-    f.ingredientes.forEach(ing => {
-      const ins = allInsumos.find(i => i.id === ing.insumoId);
-      if (!ins) return;
-
-      const quantConsumida = (ing.quantidade / (f.rendimentoPorcoes || 1)) * qty;
-      custoTotalInsumos += getInsumoQuantityCost(ins, quantConsumida);
-      movimentos.push({
-        id: `${saleId}-${ing.insumoId}`,
-        insumoId: ing.insumoId,
-        insumoNome: ins.nome,
-        tipo: 'saida',
-        quantidade: quantConsumida,
-        custoUnitario: getInsumoUnitCost(ins),
-        custoTotal: Number(getInsumoQuantityCost(ins, quantConsumida).toFixed(2)),
-        data: new Date().toISOString(),
-        observacao: `Consumo venda: ${qty}x ${f.nome} [venda:${saleId}]`,
-        setor: getInsumoSetor(ins),
-        unidade: currentUnit
-      });
-    });
-
-    return { custoTotalInsumos: Number(custoTotalInsumos.toFixed(2)), movimentos };
-  };
-
   const removeMovimentosDaVenda = (saleId: string) => {
-    setAllMovimentacoes(prev => prev.filter(m => !m.id.startsWith(`${saleId}-`) && !m.observacao?.includes(`[venda:${saleId}]`)));
+    setAllMovimentacoes(prev => prev.filter(mov =>
+      !mov.id.startsWith(`${saleId}-`) && !mov.observacao?.includes(`[venda:${saleId}]`)
+    ));
   };
 
   const restoreVendaEstoque = (venda: VendaLog) => {
-    const ficha = allFichas.find(f => f.id === venda.fichaId);
-    if (!ficha) return;
-
-    setAllInsumos(prev => prev.map(ins => {
-      const ing = ficha.ingredientes.find(i => i.insumoId === ins.id);
-      if (!ing) return ins;
-      const quantRestaurada = (ing.quantidade / (ficha.rendimentoPorcoes || 1)) * venda.quantidade;
-      return { ...ins, estoqueAtual: ins.estoqueAtual + quantRestaurada };
-    }));
+    const estoqueRestaurado = getEstoqueComVendaRestaurada(venda);
+    const saldos = new Map(estoqueRestaurado.map(insumo => [insumo.id, insumo.estoqueAtual]));
+    setAllInsumos(prev => prev.map(insumo => ({
+      ...insumo,
+      estoqueAtual: saldos.get(insumo.id) ?? insumo.estoqueAtual
+    })));
   };
 
   const updateVenda = (id: string, fichaId: string, quantidade: number) => {
-    const vendaOriginal = allVendas.find(v => v.id === id);
-    const fichaOriginal = vendaOriginal ? allFichas.find(f => f.id === vendaOriginal.fichaId) : undefined;
-    const novaFicha = allFichas.find(f => f.id === fichaId);
-    if (!vendaOriginal || !novaFicha) return { success: false, error: 'Venda ou ficha tecnica nao encontrada.' };
+    const vendaOriginal = allVendas.find(venda => venda.id === id);
+    const novaFicha = allFichas.find(ficha => ficha.id === fichaId);
+    if (!vendaOriginal || !novaFicha) {
+      return { success: false, error: 'Venda ou ficha técnica não encontrada.' };
+    }
 
     const qty = Number(quantidade);
-    const estoqueSimulado = new Map<string, number>(allInsumos.map(ins => [ins.id, ins.estoqueAtual]));
-
-    if (fichaOriginal) {
-      fichaOriginal.ingredientes.forEach(ing => {
-        const atual = estoqueSimulado.get(ing.insumoId) || 0;
-        estoqueSimulado.set(ing.insumoId, atual + ((ing.quantidade / (fichaOriginal.rendimentoPorcoes || 1)) * vendaOriginal.quantidade));
-      });
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { success: false, error: 'Informe uma quantidade válida.' };
     }
 
-    const faltando: string[] = [];
-    novaFicha.ingredientes.forEach(ing => {
-      const ins = allInsumos.find(i => i.id === ing.insumoId);
-      const necessario = (ing.quantidade / (novaFicha.rendimentoPorcoes || 1)) * qty;
-      const disponivel = estoqueSimulado.get(ing.insumoId) || 0;
-      if (!ins || disponivel < necessario) {
-        faltando.push(ins ? ins.nome : 'Insumo desconhecido');
-      } else {
-        estoqueSimulado.set(ing.insumoId, disponivel - necessario);
-      }
-    });
+    const estoqueRestaurado = getEstoqueComVendaRestaurada(vendaOriginal);
+    const resultado = buildVendaMovimentos(novaFicha, qty, id, estoqueRestaurado);
+    if (!resultado.success) return resultado;
 
-    if (faltando.length > 0) {
-      return { success: false, error: `Estoque insuficiente para: ${faltando.join(', ')}.` };
-    }
-
-    const { custoTotalInsumos, movimentos } = buildVendaMovimentos(novaFicha, qty, id);
-    const custoInsumosTotal = custoTotalInsumos;
-    setAllInsumos(prev => prev.map(ins => ({ ...ins, estoqueAtual: estoqueSimulado.get(ins.id) ?? ins.estoqueAtual })));
-    removeMovimentosDaVenda(id);
-    setAllMovimentacoes(prev => [...movimentos, ...prev]);
-    setAllVendas(prev => prev.map(v => v.id === id ? {
-      ...v,
+    setAllInsumos(prev => prev.map(insumo => ({
+      ...insumo,
+      estoqueAtual: resultado.estoqueFinal.get(insumo.id) ?? insumo.estoqueAtual
+    })));
+    setAllMovimentacoes(prev => [
+      ...resultado.movimentos,
+      ...prev.filter(mov =>
+        !mov.id.startsWith(`${id}-`) && !mov.observacao?.includes(`[venda:${id}]`)
+      )
+    ]);
+    setAllVendas(prev => prev.map(venda => venda.id === id ? {
+      ...venda,
       fichaId,
       fichaNome: novaFicha.nome,
       quantidade: qty,
       precoVendaUnitario: novaFicha.precoVenda,
       receitaTotal: Number((qty * novaFicha.precoVenda).toFixed(2)),
-      custoInsumosTotal
-    } : v));
+      custoInsumosTotal: resultado.custoTotalInsumos
+    } : venda));
     return { success: true };
   };
 
   const deleteVenda = (id: string) => {
-    const venda = allVendas.find(v => v.id === id);
-    if (!venda) return { success: false, error: 'Venda nao encontrada.' };
+    const venda = allVendas.find(item => item.id === id);
+    if (!venda) return { success: false, error: 'Venda não encontrada.' };
 
     restoreVendaEstoque(venda);
     removeMovimentosDaVenda(id);
-    setAllVendas(prev => prev.filter(v => v.id !== id));
+    setAllVendas(prev => prev.filter(item => item.id !== id));
     return { success: true };
   };
-
   const resetData = () => {
     const fresh = buildInitialCollections();
     setUser(prev => ({ ...INITIAL_USER, estabelecimento: currentUnit, metaFCP: prev.metaFCP || INITIAL_USER.metaFCP }));
