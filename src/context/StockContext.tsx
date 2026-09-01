@@ -58,6 +58,7 @@ interface StockContextType {
   resetData: () => void;
   importarDados: (jsonString: string) => boolean;
   exportarDados: () => string;
+  promoverEstadoLocal: () => Promise<{ success: boolean; error?: string }>;
   users: Array<UserProfile & { senha?: string }>;
   registerUser: (newUser: UserProfile & { senha?: string }) => void;
   deleteUser: (email: string) => void;
@@ -334,6 +335,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [allMovimentacoesUtensilios, setAllMovimentacoesUtensilios] = useState<MovimentacaoUtensilio[]>(() =>
     readJsonStorage<MovimentacaoUtensilio[]>('chef_all_movimentacoes_utensilios', initialCollections.allMovimentacoesUtensilios)
   );
+  const localSnapshotBeforeRemoteRef = useRef<AppStateSnapshot>({
+    currentUnit,
+    user,
+    users,
+    allInsumos,
+    allFichas,
+    allMovimentacoes,
+    allVendas,
+    allUtensilios,
+    allMovimentacoesUtensilios
+  });
 
   // Persist master states
   useEffect(() => {
@@ -1168,6 +1180,50 @@ useEffect(() => {
     localStorage.removeItem('chef_all_movimentacoes_utensilios');
   };
 
+  const promoverEstadoLocal = async () => {
+    const snapshot = localSnapshotBeforeRemoteRef.current;
+    if (!snapshot) return { success: false, error: 'Estado local não encontrado.' };
+
+    try {
+      let revision = remoteRevisionRef.current;
+      if (!revision) {
+        const currentResponse = await fetch('/api/state', { headers: { 'cache-control': 'no-cache' } });
+        if (!currentResponse.ok) throw new Error('Não foi possível acessar o Neon.');
+        const currentState = await currentResponse.json() as { _revision?: string };
+        revision = currentState._revision || null;
+      }
+      if (!revision) return { success: false, error: 'O Neon não informou uma revisão válida.' };
+
+      const response = await fetch('/api/state', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...snapshot, _revision: revision })
+      });
+      if (response.status === 409) {
+        return { success: false, error: 'O estado do Neon mudou. Recarregue e confira antes de tentar novamente.' };
+      }
+      if (!response.ok) throw new Error('Não foi possível gravar o estado local no Neon.');
+
+      const result = await response.json() as { _revision?: string };
+      const savedRevision = result._revision || revision;
+      remoteRevisionRef.current = savedRevision;
+      remoteBaseStateRef.current = snapshot;
+      latestSnapshotRef.current = snapshot;
+      remoteStateReadyRef.current = true;
+      setCurrentUnitState(snapshot.currentUnit);
+      setUser(snapshot.user);
+      setUsers(snapshot.users);
+      setAllInsumos(snapshot.allInsumos);
+      setAllFichas(snapshot.allFichas);
+      setAllMovimentacoes(snapshot.allMovimentacoes);
+      setAllVendas(snapshot.allVendas);
+      setAllUtensilios(snapshot.allUtensilios);
+      setAllMovimentacoesUtensilios(snapshot.allMovimentacoesUtensilios);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Não foi possível sincronizar os dados locais.' };
+    }
+  };
   const exportarDados = () => JSON.stringify(buildSnapshot(), null, 2);
 
   const importarDados = (jsonString: string): boolean => {

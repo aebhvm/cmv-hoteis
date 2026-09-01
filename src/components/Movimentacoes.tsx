@@ -27,12 +27,26 @@ const brasiliaDateFormatter = new Intl.DateTimeFormat('en-US', {
   day: '2-digit'
 });
 
+const parseMovementDate = (value: string | Date) => {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const trimmedValue = value.trim();
+  const brazilianDate = trimmedValue.match(/^(\d{2})[/-](\d{2})[/-](\d{4})/);
+  if (brazilianDate) {
+    const [, day, month, year] = brazilianDate;
+    const parsedBrazilianDate = new Date(`${year}-${month}-${day}T12:00:00-03:00`);
+    return Number.isNaN(parsedBrazilianDate.getTime()) ? null : parsedBrazilianDate;
+  }
+  const date = new Date(trimmedValue);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const toLocalDateKey = (value: string | Date) => {
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const date = value instanceof Date ? value : new Date(value);
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = parseMovementDate(value);
+  if (!date) return "";
   const parts = brasiliaDateFormatter.formatToParts(date);
-  const getPart = (type: string) => parts.find(part => part.type === type)?.value || '';
-  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+  const getPart = (type: string) => parts.find(part => part.type === type)?.value || "";
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
 };
 
 const toMovementIso = (dateKey: string, previousDate?: string) => {
@@ -76,7 +90,6 @@ export const Movimentacoes: React.FC = () => {
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const firstMovementFieldRef = useRef<HTMLSelectElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const normalizeSearch = (value: string) =>
@@ -186,7 +199,7 @@ export const Movimentacoes: React.FC = () => {
     setSetorMovimentacao(setorAtivo === 'Todos' ? SETOR_RESTAURANTE : setorAtivo);
     setErrorMsg('');
     setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');
-    window.requestAnimationFrame(() => firstMovementFieldRef.current?.focus());
+    window.requestAnimationFrame(() => productSearchRef.current?.focus());
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
@@ -254,8 +267,8 @@ export const Movimentacoes: React.FC = () => {
 
   // Filtragem
   const filteredMovs = movimentacoes.filter(m => {
-    const matchesSearch = m.insumoNome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (m.observacao && m.observacao.toLowerCase().includes(searchTerm.toLowerCase()));
+    const normalizedSearchTerm = normalizeSearch(searchTerm.trim());
+    const matchesSearch = !normalizedSearchTerm || normalizeSearch(m.insumoNome || '').includes(normalizedSearchTerm);
     const matchesType = selectedType === 'todos'
       || m.tipo === selectedType
       || (selectedType === 'saida' && m.tipo === 'ajuste' && m.quantidade < 0)
@@ -263,7 +276,7 @@ export const Movimentacoes: React.FC = () => {
     const matchesDate = !selectedDate || toLocalDateKey(m.data) === selectedDate;
     const matchesSector = setorAtivo === 'Todos' || getMovimentacaoSetor(m) === setorAtivo;
     return matchesSearch && matchesType && matchesDate && matchesSector;
-  }).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  }).sort((a, b) => (parseMovementDate(b.data)?.getTime() || 0) - (parseMovementDate(a.data)?.getTime() || 0));
 
   const groupedMovs = filteredMovs.reduce<Array<{ dateKey: string; items: typeof filteredMovs }>>((groups, mov) => {
     const dateKey = toLocalDateKey(mov.data);
@@ -447,7 +460,6 @@ export const Movimentacoes: React.FC = () => {
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tipo de Lançamento *</label>
               <select
-                ref={firstMovementFieldRef}
                 value={tipo}
                 onChange={(e) => {
                   setTipo(e.target.value as any);
@@ -742,9 +754,13 @@ export const Movimentacoes: React.FC = () => {
                       </td>
                     </tr>
                     {group.items.map(m => {
-                  const dataObj = new Date(m.data);
-                  const dataFormatada = dataObj.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE });
-                  const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
+                  const dataObj = parseMovementDate(m.data);
+                  const dataFormatada = dataObj
+                    ? dataObj.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE })
+                    : 'Data inválida';
+                  const horaFormatada = dataObj
+                    ? dataObj.toLocaleTimeString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, hour: '2-digit', minute: '2-digit' })
+                    : '--:--';
                   
                   const estiloBadge = getTipoEstilo(m);
                   const ins = insumos.find(i => i.id === m.insumoId);

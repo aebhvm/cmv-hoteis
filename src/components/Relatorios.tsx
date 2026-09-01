@@ -6,7 +6,8 @@ import writeExcelFile from 'write-excel-file/browser';
 import { 
   BarChart4, 
   Download, 
-  Upload, 
+  Upload,
+  CloudUpload,
   Trash2, 
   Info, 
   TrendingUp, 
@@ -130,7 +131,7 @@ const parseExcelBackup = async (file: File) => {
 };
 
 export const Relatorios: React.FC = () => {
-  const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, resetData, importarDados, exportarDados } = useStock();
+  const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, resetData, importarDados, exportarDados, promoverEstadoLocal } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
 
   // Estado para simulação de choque de preços de insumos
@@ -142,6 +143,7 @@ export const Relatorios: React.FC = () => {
   const [showImportArea, setShowImportArea] = useState(false);
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
+  const [localPromoteBusy, setLocalPromoteBusy] = useState(false);
 
   // 1. Cálculos de CMV Geral
   const receitaAcumulada = vendas.reduce((acc, v) => acc + v.receitaTotal, 0);
@@ -224,6 +226,24 @@ export const Relatorios: React.FC = () => {
     }
   };
 
+  const handlePromoteLocal = async () => {
+    if (isColaborador || localPromoteBusy) return;
+    const confirmed = window.confirm(
+      'Isso substituirá o estado atual do Neon pelos dados capturados neste dispositivo. O estado local será considerado a fonte principal. Deseja continuar?'
+    );
+    if (!confirmed) return;
+
+    setLocalPromoteBusy(true);
+    setImportError('');
+    setImportSuccess('');
+    const result = await promoverEstadoLocal();
+    setLocalPromoteBusy(false);
+    if (result.success) {
+      setImportSuccess('Dados deste dispositivo publicados como estado principal no Neon.');
+    } else {
+      setImportError(result.error || 'Não foi possível publicar os dados deste dispositivo.');
+    }
+  };
   // 4. Analítica de Simulação de Choque de Preços
   // Retorna receitas afetadas pelo insumo selecionado
   const getFichasAfetadasPeloInsumo = () => {
@@ -429,7 +449,7 @@ export const Relatorios: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-4">Administração de Dados & Segurança</span>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <Download className="w-4.5 h-4.5 text-brand-navy" />
@@ -470,6 +490,31 @@ export const Relatorios: React.FC = () => {
             )}
           </div>
 
+          <div className="space-y-2">
+            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              <CloudUpload className="w-4.5 h-4.5 text-brand-navy" />
+              Tornar este PC principal
+            </h4>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Publica no Neon os dados preservados neste dispositivo para que os demais possam sincronizar.
+            </p>
+
+            {!isColaborador ? (
+              <button
+                onClick={handlePromoteLocal}
+                disabled={localPromoteBusy}
+                className="mt-2 px-4 py-2 bg-brand-navy hover:bg-brand-navy/90 disabled:opacity-60 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer disabled:cursor-wait transition-all shadow-sm"
+              >
+                <CloudUpload className="w-3.5 h-3.5" />
+                {localPromoteBusy ? 'Publicando...' : 'Publicar dados deste PC'}
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-brand-gold bg-brand-gold/10 border border-brand-gold/20 px-2.5 py-1.5 rounded-lg mt-2">
+                <Lock className="w-3.5 h-3.5" />
+                <span>Exclusivo do Gestor</span>
+              </div>
+            )}
+          </div>
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <RefreshCw className="w-4.5 h-4.5 text-brand-navy" />
