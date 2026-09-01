@@ -252,6 +252,18 @@ const buildStatePatch = (base: AppStateSnapshot, next: AppStateSnapshot): StateP
 };
 
 const hasPatchChanges = (patch: StatePatch) => Object.keys(patch).length > 0;
+const REMOTE_REVISION_STORAGE_KEY = 'chef_remote_revision';
+const REMOTE_FINGERPRINT_STORAGE_KEY = 'chef_remote_fingerprint';
+
+const getSnapshotFingerprint = (snapshot: AppStateSnapshot) => {
+  const serialized = JSON.stringify(snapshot);
+  let hash = 2166136261;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+};
 
 const snapshotFromRemote = (state: any): AppStateSnapshot => ({
   currentUnit: state.currentUnit,
@@ -402,17 +414,46 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 useEffect(() => {
     let active = true;
 
-    fetch('/api/state')
-      .then(async response => {
+    const loadRemoteState = async () => {
+      try {
+        const metaResponse = await fetch('/api/state?meta=1', { headers: { 'cache-control': 'no-cache' } });
+        if (!metaResponse.ok) throw new Error('Remote state unavailable');
+        const meta = await metaResponse.json() as { _revision?: string };
+        const localRevision = localStorage.getItem(REMOTE_REVISION_STORAGE_KEY);
+        const localStateKeys = [
+          'chef_all_insumos',
+          'chef_all_fichas',
+          'chef_all_movimentacoes',
+          'chef_all_vendas',
+          'chef_all_utensilios',
+          'chef_all_movimentacoes_utensilios'
+        ];
+        const hasLocalSnapshot = localStateKeys.every(key => Boolean(localStorage.getItem(key)));
+        const localFingerprint = localStorage.getItem(REMOTE_FINGERPRINT_STORAGE_KEY);
+
+        if (active && localRevision && meta._revision === localRevision && hasLocalSnapshot) {
+          const localSnapshot = buildSnapshot();
+          if (localFingerprint !== getSnapshotFingerprint(localSnapshot)) {
+            // Local changes not confirmed by the server must be reconciled first.
+          } else {
+          remoteBaseStateRef.current = localSnapshot;
+          latestSnapshotRef.current = localSnapshot;
+          remoteRevisionRef.current = localRevision;
+          remoteStateReadyRef.current = true;
+          return;
+          }
+        }
+
+        const response = await fetch('/api/state', { headers: { 'cache-control': 'no-cache' } });
         if (!response.ok) throw new Error('Remote state unavailable');
-        return response.json() as Promise<Partial<AppStateSnapshot> & { _revision?: string }>;
-      })
-      .then(data => {
+        const data = await response.json() as Partial<AppStateSnapshot> & { _revision?: string };
         if (!active) return;
         const remoteSnapshot = snapshotFromRemote(data);
         remoteBaseStateRef.current = remoteSnapshot;
         latestSnapshotRef.current = remoteSnapshot;
         remoteRevisionRef.current = data._revision || null;
+        if (data._revision) localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, data._revision);
+        localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(remoteSnapshot));
         const hasActiveSession = sessionStorage.getItem('chef_is_logged_in') === 'true';
         if (!hasActiveSession && data.currentUnit) setCurrentUnitState(data.currentUnit);
         if (!hasActiveSession && data.user) setUser(data.user);
@@ -424,11 +465,12 @@ useEffect(() => {
         if (Array.isArray(data.allUtensilios)) setAllUtensilios(data.allUtensilios);
         if (Array.isArray(data.allMovimentacoesUtensilios)) setAllMovimentacoesUtensilios(data.allMovimentacoesUtensilios);
         remoteStateReadyRef.current = true;
-      })
-      .catch(() => {
+      } catch {
         // Keep local data for offline use. It must not overwrite the remote state.
-      });
+      }
+    };
 
+    void loadRemoteState();
     return () => {
       active = false;
     };
@@ -469,15 +511,19 @@ useEffect(() => {
           response = await fetch('/api/state', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ patch, revision: remoteRevisionRef.current })
+            body: JSON.stringify({ patch, revision: remoteRevisionRef.current, returnState: true })
           });
         }
 
         if (!response.ok) throw new Error('Remote state unavailable');
 
-        const result = await response.json();
-        remoteRevisionRef.current = result.state?._revision || remoteRevisionRef.current;
-        remoteBaseStateRef.current = snapshotFromRemote(result.state);
+        const result = await response.json() as { _revision?: string; state?: Partial<AppStateSnapshot> & { _revision?: string } };
+        const savedRevision = result.state?._revision || result._revision || remoteRevisionRef.current;
+        remoteRevisionRef.current = savedRevision;
+        const syncedSnapshot = result.state ? snapshotFromRemote(result.state) : snapshot;
+        remoteBaseStateRef.current = syncedSnapshot;
+        if (savedRevision) localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, savedRevision);
+        localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(syncedSnapshot));
         saved = true;
       } catch (error) {
         console.error('Unable to save changes.', error);
@@ -1207,6 +1253,8 @@ useEffect(() => {
       const result = await response.json() as { _revision?: string };
       const savedRevision = result._revision || revision;
       remoteRevisionRef.current = savedRevision;
+      localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, savedRevision);
+      localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(snapshot));
       remoteBaseStateRef.current = snapshot;
       latestSnapshotRef.current = snapshot;
       remoteStateReadyRef.current = true;
