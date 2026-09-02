@@ -1,16 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { StockProvider, useStock } from './context/StockContext';
 import { AuthSim } from './components/AuthSim';
 import { InstallAppPrompt } from './components/InstallAppPrompt';
-import { Dashboard } from './components/Dashboard';
-import { Insumos } from './components/Insumos';
-import { FichasTecnicas } from './components/FichasTecnicas';
-import { Movimentacoes } from './components/Movimentacoes';
-import { Inventario } from './components/Inventario';
-import { Utensilios } from './components/Utensilios';
-import { Vendas } from './components/Vendas';
-import { Relatorios } from './components/Relatorios';
-import { Usuarios } from './components/Usuarios';
+
+const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
+const Insumos = lazy(() => import('./components/Insumos').then(module => ({ default: module.Insumos })));
+const FichasTecnicas = lazy(() => import('./components/FichasTecnicas').then(module => ({ default: module.FichasTecnicas })));
+const Movimentacoes = lazy(() => import('./components/Movimentacoes').then(module => ({ default: module.Movimentacoes })));
+const Inventario = lazy(() => import('./components/Inventario').then(module => ({ default: module.Inventario })));
+const Utensilios = lazy(() => import('./components/Utensilios').then(module => ({ default: module.Utensilios })));
+const Vendas = lazy(() => import('./components/Vendas').then(module => ({ default: module.Vendas })));
+const Relatorios = lazy(() => import('./components/Relatorios').then(module => ({ default: module.Relatorios })));
+const Usuarios = lazy(() => import('./components/Usuarios').then(module => ({ default: module.Usuarios })));
 import { 
   LayoutDashboard, 
   Boxes, 
@@ -305,7 +306,9 @@ function AppContent() {
 
         {/* Corpo da Visão Ativa */}
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6" id="view-container">
-          {renderActiveView()}
+          <Suspense fallback={<div className="flex min-h-32 items-center justify-center text-sm text-slate-500">Carregando...</div>}>
+            {renderActiveView()}
+          </Suspense>
         </div>
       </main>
     </div>

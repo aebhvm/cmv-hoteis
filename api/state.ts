@@ -118,6 +118,18 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
     $function$`;
 };
 
+let schemaReady: Promise<void> | null = null;
+
+const ensureSchemaOnce = (sql: ReturnType<typeof neon>) => {
+  if (!schemaReady) {
+    schemaReady = ensureSchema(sql).catch(error => {
+      schemaReady = null;
+      throw error;
+    });
+  }
+  return schemaReady;
+};
+
 const dedupeInsumosById = (items: any[]) => {
   const seen = new Set<string>();
   return items.filter(item => {
@@ -214,19 +226,18 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   try {
     const sql = getSql();
-    await ensureSchema(sql);
+    await ensureSchemaOnce(sql);
 
     if (req.method === 'GET') {
       const requestUrl = new URL(req.url || '/', `http://${req.headers?.host || 'localhost'}`);
       if (requestUrl.searchParams.get('meta') === '1') {
-        const rows = await sql`SELECT updated_at, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+        const rows = await sql`SELECT revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
         return res.status(200).json({
-          _revision: rows.length > 0 ? String(rows[0].revision) : '0',
-          updatedAt: rows.length > 0 ? rows[0].updated_at : null
+          _revision: rows.length > 0 ? String(rows[0].revision) : '0'
         });
       }
 
-      const rows = await sql`SELECT data, updated_at, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+      const rows = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
       if (rows.length > 0) {
         const normalized = normalizeState(rows[0].data);
         let revision = rows[0].revision;
@@ -256,18 +267,16 @@ export default async function handler(req: any, res: any) {
       }
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        const current = await sql`SELECT revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
-        if (current.length === 0) {
-          await sql`
-            INSERT INTO app_state (id, data)
-            VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
-            ON CONFLICT (id) DO NOTHING
-          `;
-          continue;
-        }
-
-        if (body.revision === undefined || String(body.revision) !== String(current[0].revision)) {
+        if (body.revision === undefined) {
           const conflictRows = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+          if (conflictRows.length === 0) {
+            await sql`
+              INSERT INTO app_state (id, data)
+              VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
+              ON CONFLICT (id) DO NOTHING
+            `;
+            continue;
+          }
           return res.status(409).json({
             error: 'State conflict.',
             state: { ...normalizeState(conflictRows[0].data), _revision: String(conflictRows[0].revision) }
@@ -278,7 +287,7 @@ export default async function handler(req: any, res: any) {
         const saved = await sql`
           UPDATE app_state
           SET data = cmv_apply_state_patch(app_state.data, ${patchJson}::jsonb), updated_at = now(), revision = revision + 1
-          WHERE id = ${APP_STATE_ID} AND revision = ${current[0].revision}
+          WHERE id = ${APP_STATE_ID} AND revision = ${String(body.revision)}::bigint
           RETURNING revision
         `;
 
@@ -293,6 +302,20 @@ export default async function handler(req: any, res: any) {
           }
           return res.status(200).json({ ok: true, _revision: savedRevision });
         }
+
+        const conflictRows = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+        if (conflictRows.length === 0) {
+          await sql`
+            INSERT INTO app_state (id, data)
+            VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
+            ON CONFLICT (id) DO NOTHING
+          `;
+          continue;
+        }
+        return res.status(409).json({
+          error: 'State conflict.',
+          state: { ...normalizeState(conflictRows[0].data), _revision: String(conflictRows[0].revision) }
+        });
       }
 
       return res.status(409).json({ error: 'Unable to apply changes. Please retry.' });
@@ -306,7 +329,7 @@ export default async function handler(req: any, res: any) {
 
       const { _revision: revision, ...state } = body;
       const normalized = normalizeState(state);
-      const current = await sql`SELECT data, updated_at, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+      const current = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
 
       if (current.length > 0 && (!revision || revision !== String(current[0].revision))) {
         return res.status(409).json({
@@ -320,7 +343,7 @@ export default async function handler(req: any, res: any) {
         VALUES (${APP_STATE_ID}, ${JSON.stringify(normalized)}::jsonb, now())
         ON CONFLICT (id)
         DO UPDATE SET data = excluded.data, updated_at = now(), revision = app_state.revision + 1
-        RETURNING updated_at, revision
+        RETURNING revision
       `;
 
       return res.status(200).json({ ok: true, _revision: String(saved[0].revision) });

@@ -254,6 +254,7 @@ const buildStatePatch = (base: AppStateSnapshot, next: AppStateSnapshot): StateP
 const hasPatchChanges = (patch: StatePatch) => Object.keys(patch).length > 0;
 const REMOTE_REVISION_STORAGE_KEY = 'chef_remote_revision';
 const REMOTE_FINGERPRINT_STORAGE_KEY = 'chef_remote_fingerprint';
+const SYNC_DEBOUNCE_MS = 250;
 
 const getSnapshotFingerprint = (snapshot: AppStateSnapshot) => {
   const serialized = JSON.stringify(snapshot);
@@ -433,14 +434,12 @@ useEffect(() => {
 
         if (active && localRevision && meta._revision === localRevision && hasLocalSnapshot) {
           const localSnapshot = buildSnapshot();
-          if (localFingerprint !== getSnapshotFingerprint(localSnapshot)) {
-            // Local changes not confirmed by the server must be reconciled first.
-          } else {
-          remoteBaseStateRef.current = localSnapshot;
-          latestSnapshotRef.current = localSnapshot;
-          remoteRevisionRef.current = localRevision;
-          remoteStateReadyRef.current = true;
-          return;
+          if (localFingerprint === getSnapshotFingerprint(localSnapshot)) {
+            remoteBaseStateRef.current = localSnapshot;
+            latestSnapshotRef.current = localSnapshot;
+            remoteRevisionRef.current = localRevision;
+            remoteStateReadyRef.current = true;
+            return;
           }
         }
 
@@ -493,6 +492,8 @@ useEffect(() => {
       const base = remoteBaseStateRef.current;
       if (!snapshot || !base) return;
 
+      if (getSnapshotFingerprint(snapshot) === getSnapshotFingerprint(base)) return;
+
       const patch = buildStatePatch(base, snapshot);
       if (!hasPatchChanges(patch)) return;
 
@@ -538,7 +539,7 @@ useEffect(() => {
 
     const timer = window.setTimeout(() => {
       void syncChanges();
-    }, 100);
+    }, SYNC_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios]);
@@ -1233,7 +1234,7 @@ useEffect(() => {
     try {
       let revision = remoteRevisionRef.current;
       if (!revision) {
-        const currentResponse = await fetch('/api/state', { headers: { 'cache-control': 'no-cache' } });
+        const currentResponse = await fetch('/api/state?meta=1', { headers: { 'cache-control': 'no-cache' } });
         if (!currentResponse.ok) throw new Error('Não foi possível acessar o Neon.');
         const currentState = await currentResponse.json() as { _revision?: string };
         revision = currentState._revision || null;
