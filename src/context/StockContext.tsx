@@ -51,8 +51,8 @@ interface StockContextType {
   criarFichasDePicole: () => { created: number; skipped: number };
   updateFicha: (id: string, ficha: Partial<FichaTecnica>) => void;
   deleteFicha: (id: string) => void;
-  registrarVenda: (fichaId: string, quantidade: number) => { success: boolean; error?: string };
-  updateVenda: (id: string, fichaId: string, quantidade: number) => { success: boolean; error?: string };
+  registrarVenda: (fichaId: string, quantidade: number, data?: string) => { success: boolean; error?: string };
+  updateVenda: (id: string, fichaId: string, quantidade: number, data?: string) => { success: boolean; error?: string };
   deleteVenda: (id: string) => { success: boolean; error?: string };
   getFichaCusto: (ficha: FichaTecnica) => number;
   resetData: () => void;
@@ -1110,7 +1110,7 @@ useEffect(() => {
   };
 
   // O faturamento usa o saldo combinado do mesmo insumo nos dois setores.
-  const registrarVenda = (fichaId: string, quantidade: number) => {
+  const registrarVenda = (fichaId: string, quantidade: number, data?: string) => {
     const qty = Number(quantidade);
     const ficha = fichas.find(item => item.id === fichaId);
     if (!ficha) return { success: false, error: 'Ficha técnica não encontrada.' };
@@ -1119,6 +1119,11 @@ useEffect(() => {
     }
 
     const saleId = `ven-${Date.now()}`;
+    const dataLancamento = data || new Date().toISOString();
+    if (Number.isNaN(new Date(dataLancamento).getTime())) {
+      return { success: false, error: 'Informe uma data de lançamento válida.' };
+    }
+
     const resultado = buildVendaMovimentos(ficha, qty, saleId);
     if (!resultado.success) return resultado;
 
@@ -1136,7 +1141,7 @@ useEffect(() => {
       precoVendaUnitario: ficha.precoVenda,
       receitaTotal: Number((qty * ficha.precoVenda).toFixed(2)),
       custoInsumosTotal: resultado.custoTotalInsumos,
-      data: new Date().toISOString(),
+      data: dataLancamento,
       unidade: currentUnit
     };
 
@@ -1159,7 +1164,7 @@ useEffect(() => {
     })));
   };
 
-  const updateVenda = (id: string, fichaId: string, quantidade: number) => {
+  const updateVenda = (id: string, fichaId: string, quantidade: number, data?: string) => {
     const vendaOriginal = allVendas.find(venda => venda.id === id);
     const novaFicha = allFichas.find(ficha => ficha.id === fichaId);
     if (!vendaOriginal || !novaFicha) {
@@ -1169,6 +1174,11 @@ useEffect(() => {
     const qty = Number(quantidade);
     if (!Number.isFinite(qty) || qty <= 0) {
       return { success: false, error: 'Informe uma quantidade válida.' };
+    }
+
+    const dataLancamento = data || vendaOriginal.data;
+    if (Number.isNaN(new Date(dataLancamento).getTime())) {
+      return { success: false, error: 'Informe uma data de lançamento válida.' };
     }
 
     const estoqueRestaurado = getEstoqueComVendaRestaurada(vendaOriginal);
@@ -1192,7 +1202,8 @@ useEffect(() => {
       quantidade: qty,
       precoVendaUnitario: novaFicha.precoVenda,
       receitaTotal: Number((qty * novaFicha.precoVenda).toFixed(2)),
-      custoInsumosTotal: resultado.custoTotalInsumos
+      custoInsumosTotal: resultado.custoTotalInsumos,
+      data: dataLancamento
     } : venda));
     return { success: true };
   };

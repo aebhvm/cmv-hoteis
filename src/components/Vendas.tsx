@@ -15,6 +15,31 @@ import {
 
 const BRASILIA_TIME_ZONE = 'America/Sao_Paulo';
 
+const formatDateInputValue = (date: Date) => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BRASILIA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const year = parts.find(part => part.type === 'year')?.value;
+  const month = parts.find(part => part.type === 'month')?.value;
+  const day = parts.find(part => part.type === 'day')?.value;
+  return year && month && day ? year + '-' + month + '-' + day : '';
+};
+
+const getDateInputValue = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : formatDateInputValue(date);
+};
+
+const getTodayDateInputValue = () => formatDateInputValue(new Date());
+
+const dateInputToIso = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12)).toISOString();
+};
+
 const getBrasiliaMonthKey = (value: string) => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: BRASILIA_TIME_ZONE,
@@ -39,6 +64,7 @@ export const Vendas: React.FC = () => {
 
   const [selectedFichaId, setSelectedFichaId] = useState<string | null>(null);
   const [quantidadeVenda, setQuantidadeVenda] = useState('1');
+  const [dataLancamento, setDataLancamento] = useState(getTodayDateInputValue);
   const [editingVendaId, setEditingVendaId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [periodoSelecionado, setPeriodoSelecionado] = useState('todos');
@@ -74,6 +100,7 @@ export const Vendas: React.FC = () => {
     setSelectedFichaId(null);
     setEditingVendaId(null);
     setQuantidadeVenda('1');
+    setDataLancamento(getTodayDateInputValue());
     setErrorMsg('');
   };
 
@@ -85,6 +112,7 @@ export const Vendas: React.FC = () => {
         setSelectedFichaId(null);
         setEditingVendaId(null);
         setQuantidadeVenda('1');
+        setDataLancamento(getTodayDateInputValue());
         setErrorMsg('');
       }
     };
@@ -95,15 +123,15 @@ export const Vendas: React.FC = () => {
 
   const handleVenderSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedFichaId || !quantidadeVenda) return;
+    if (!selectedFichaId || !quantidadeVenda || !dataLancamento) return;
 
     const qty = Number(quantidadeVenda);
     const ficha = fichas.find(item => item.id === selectedFichaId);
     if (!ficha) return;
 
     const result = editingVendaId
-      ? updateVenda(editingVendaId, selectedFichaId, qty)
-      : registrarVenda(selectedFichaId, qty);
+      ? updateVenda(editingVendaId, selectedFichaId, qty, dateInputToIso(dataLancamento))
+      : registrarVenda(selectedFichaId, qty, dateInputToIso(dataLancamento));
 
     if (result.success) {
       setSuccessMsg(editingVendaId
@@ -113,6 +141,7 @@ export const Vendas: React.FC = () => {
       setSelectedFichaId(null);
       setEditingVendaId(null);
       setQuantidadeVenda('1');
+      setDataLancamento(getTodayDateInputValue());
       setTimeout(() => setSuccessMsg(''), 4000);
     } else {
       setErrorMsg(result.error || 'Erro desconhecido ao salvar venda.');
@@ -126,6 +155,7 @@ export const Vendas: React.FC = () => {
     setEditingVendaId(id);
     setSelectedFichaId(venda.fichaId);
     setQuantidadeVenda(venda.quantidade.toString());
+    setDataLancamento(getDateInputValue(venda.data) || getTodayDateInputValue());
     setErrorMsg('');
     setSuccessMsg('');
   };
@@ -138,6 +168,7 @@ export const Vendas: React.FC = () => {
         setEditingVendaId(null);
         setSelectedFichaId(null);
         setQuantidadeVenda('1');
+        setDataLancamento(getTodayDateInputValue());
       }
       setSuccessMsg('Venda excluída e estoque restaurado.');
       setErrorMsg('');
@@ -233,6 +264,7 @@ export const Vendas: React.FC = () => {
                       setEditingVendaId(null);
                       setSelectedFichaId(ficha.id);
                       setQuantidadeVenda('1');
+                      setDataLancamento(getTodayDateInputValue());
                       setErrorMsg('');
                     }}
                     aria-label={`Registrar venda de ${ficha.nome}`}
@@ -361,6 +393,20 @@ export const Vendas: React.FC = () => {
               </div>
 
               <div>
+                <label htmlFor="data-lancamento-venda" className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                  Data de Lançamento *
+                </label>
+                <input
+                  id="data-lancamento-venda"
+                  type="date"
+                  required
+                  value={dataLancamento}
+                  onChange={(event) => setDataLancamento(event.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+                />
+              </div>
+
+              <div>
                 <label htmlFor="quantidade-venda" className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                   Quantidade de Porções Vendidas *
                 </label>
@@ -419,7 +465,7 @@ export const Vendas: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-4">Horário da Venda</th>
+                <th className="py-3 px-4">Data de Lançamento</th>
                 <th className="py-3 px-4">Item de Cardápio</th>
                 <th className="py-3 px-4 text-right">Qtd</th>
                 <th className="py-3 px-4 text-right">Valor Unitário</th>
@@ -442,7 +488,7 @@ export const Vendas: React.FC = () => {
                   return (
                     <tr key={venda.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-mono text-slate-400">
-                        {new Date(venda.data).toLocaleString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(venda.data).toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, day: '2-digit', month: '2-digit', year: 'numeric' })}
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-800">{venda.fichaNome}</td>
                       <td className="py-3 px-4 text-right font-mono font-medium">{venda.quantidade}x</td>
