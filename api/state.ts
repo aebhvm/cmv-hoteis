@@ -177,7 +177,11 @@ const isValidPatch = (value: unknown) => {
   return collectionKeys.every(key => value[key] === undefined || isValidCollectionPatch(value[key]));
 };
 
-const getEntityKey = (item: any) => String(item?.id || item?.email || '');
+const getEntityKey = (item: any) => {
+  const baseKey = String(item?.id || item?.email || '');
+  const isVenda = item && typeof item === 'object' && 'fichaId' in item && 'receitaTotal' in item;
+  return isVenda ? baseKey + '::' + String(item?.unidade || '') : baseKey;
+};
 
 const readJsonBody = (req: any) => {
   const contentLength = Number(req.headers?.['content-length'] || 0);

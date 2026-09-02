@@ -220,7 +220,11 @@ type StatePatch = Partial<Pick<AppStateSnapshot, 'currentUnit' | 'user'>> & {
 };
 
 const statesMatch = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
-const entityKey = (item: any) => String(item?.id || item?.email || '');
+const entityKey = (item: any) => {
+  const baseKey = String(item?.id || item?.email || '');
+  const isVenda = item && typeof item === 'object' && 'fichaId' in item && 'receitaTotal' in item;
+  return isVenda ? baseKey + '::' + String(item?.unidade || '') : baseKey;
+};
 
 const buildCollectionPatch = (base: any[], next: any[]): CollectionPatch | undefined => {
   const baseByKey = new Map(base.map(item => [entityKey(item), item]));
@@ -1195,7 +1199,7 @@ useEffect(() => {
         !mov.id.startsWith(`${id}-`) && !mov.observacao?.includes(`[venda:${id}]`)
       )
     ]);
-    setAllVendas(prev => prev.map(venda => venda.id === id ? {
+    setAllVendas(prev => prev.map(venda => venda.id === id && venda.unidade === currentUnit ? {
       ...venda,
       fichaId,
       fichaNome: novaFicha.nome,
