@@ -60,6 +60,16 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
   `;
   await sql`ALTER TABLE app_state ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0`;
   await sql`
+    CREATE OR REPLACE FUNCTION cmv_entity_key(item jsonb)
+    RETURNS text LANGUAGE sql IMMUTABLE AS $function$
+      SELECT CASE
+        WHEN item ? 'fichaId' AND item ? 'receitaTotal'
+          THEN COALESCE(NULLIF(item->>'id', ''), '') || '::' || COALESCE(item->>'unidade', '')
+        ELSE COALESCE(NULLIF(item->>'id', ''), NULLIF(item->>'email', ''), '')
+      END
+    $function$`;
+
+  await sql`
     CREATE OR REPLACE FUNCTION cmv_merge_json_collection(current_items jsonb, collection_patch jsonb)
     RETURNS jsonb LANGUAGE plpgsql IMMUTABLE AS $function$
     DECLARE
@@ -69,11 +79,11 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
       result jsonb := '[]'::jsonb;
     BEGIN
       FOR item IN SELECT value FROM jsonb_array_elements(COALESCE(current_items, '[]'::jsonb)) LOOP
-        item_key := COALESCE(NULLIF(item->>'id', ''), NULLIF(item->>'email', ''), '');
+        item_key := cmv_entity_key(item);
         replacement := NULL;
         SELECT candidate INTO replacement
         FROM jsonb_array_elements(COALESCE(collection_patch->'upserts', '[]'::jsonb)) AS candidate
-        WHERE COALESCE(NULLIF(candidate->>'id', ''), NULLIF(candidate->>'email', ''), '') = item_key
+        WHERE cmv_entity_key(candidate) = item_key
         LIMIT 1;
         IF NOT EXISTS (
           SELECT 1 FROM jsonb_array_elements(COALESCE(collection_patch->'deleted', '[]'::jsonb)) AS deleted_item
@@ -83,10 +93,10 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
         END IF;
       END LOOP;
       FOR item IN SELECT value FROM jsonb_array_elements(COALESCE(collection_patch->'upserts', '[]'::jsonb)) LOOP
-        item_key := COALESCE(NULLIF(item->>'id', ''), NULLIF(item->>'email', ''), '');
+        item_key := cmv_entity_key(item);
         IF item_key <> '' AND NOT EXISTS (
           SELECT 1 FROM jsonb_array_elements(COALESCE(current_items, '[]'::jsonb)) AS existing_item
-          WHERE COALESCE(NULLIF(existing_item->>'id', ''), NULLIF(existing_item->>'email', ''), '') = item_key
+          WHERE cmv_entity_key(existing_item) = item_key
         ) THEN
           result := result || jsonb_build_array(item);
         END IF;
