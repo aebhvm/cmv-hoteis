@@ -63,8 +63,8 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
     CREATE OR REPLACE FUNCTION cmv_entity_key(item jsonb)
     RETURNS text LANGUAGE sql IMMUTABLE AS $function$
       SELECT CASE
-        WHEN item ? 'fichaId' AND item ? 'receitaTotal'
-          THEN COALESCE(NULLIF(item->>'id', ''), '') || '::' || COALESCE(item->>'unidade', '')
+        WHEN item ? 'unidade' AND COALESCE(item->>'unidade', '') <> ''
+          THEN COALESCE(NULLIF(item->>'id', ''), '') || '::' || (item->>'unidade')
         ELSE COALESCE(NULLIF(item->>'id', ''), NULLIF(item->>'email', ''), '')
       END
     $function$`;

@@ -222,8 +222,7 @@ type StatePatch = Partial<Pick<AppStateSnapshot, 'currentUnit' | 'user'>> & {
 const statesMatch = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
 const entityKey = (item: any) => {
   const baseKey = String(item?.id || item?.email || '');
-  const isVenda = item && typeof item === 'object' && 'fichaId' in item && 'receitaTotal' in item;
-  return isVenda ? baseKey + '::' + String(item?.unidade || '') : baseKey;
+  return item?.unidade ? baseKey + '::' + String(item.unidade) : baseKey;
 };
 
 const buildCollectionPatch = (base: any[], next: any[]): CollectionPatch | undefined => {
@@ -550,7 +549,7 @@ useEffect(() => {
 
   // Derived filtered state for current unit
   const insumos = allInsumos.filter(i => i.unidade === currentUnit);
-  const fichas = allFichas.filter(f => f.unidade === currentUnit);
+  const fichas = allFichas.filter(f => f.unidade === currentUnit && !f.excluida);
   const movimentacoes = allMovimentacoes.filter(m => m.unidade === currentUnit);
   const vendas = allVendas.filter(v => v.unidade === currentUnit);
   const utensilios = allUtensilios.filter(u => u.unidade === currentUnit);
@@ -962,7 +961,7 @@ useEffect(() => {
 
   const updateFicha = (id: string, updatedFields: Partial<FichaTecnica>) => {
     setAllFichas(prev => prev.map(fic => {
-      if (fic.id === id) {
+      if (fic.id === id && fic.unidade === currentUnit && !fic.excluida) {
         return { ...fic, ...updatedFields };
       }
       return fic;
@@ -970,7 +969,11 @@ useEffect(() => {
   };
 
   const deleteFicha = (id: string) => {
-    setAllFichas(prev => prev.filter(fic => fic.id !== id));
+    setAllFichas(prev => prev.map(fic =>
+      fic.id === id && fic.unidade === currentUnit
+        ? { ...fic, excluida: true }
+        : fic
+    ));
   };
 
   const normalizeInsumoNome = (nome: string) => nome

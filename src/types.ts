@@ -30,6 +30,7 @@ export interface FichaTecnica {
   rendimentoPorcoes: number; // Rendimento em porções (geralmente 1)
   descricao?: string;
   unidade?: string;
+  excluida?: boolean;
 }
 
 export interface Movimentacao {
