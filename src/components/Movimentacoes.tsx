@@ -106,6 +106,11 @@ export const Movimentacoes: React.FC = () => {
     return insumo ? getInsumoSetor(insumo) : SETOR_RESTAURANTE;
   };
 
+  // O nome gravado na movimentacao pode ser antigo. O cadastro vinculado pelo
+  // ID e a fonte principal para que o filtro e a tabela usem o mesmo produto.
+  const getMovimentacaoNome = (mov: Movimentacao) =>
+    insumos.find(item => item.id === mov.insumoId)?.nome || mov.insumoNome || '';
+
   const handleSetorChange = (setor: 'Todos' | SetorEstoque) => {
     setSetorAtivo(setor);
     if (setor !== 'Todos') setSetorMovimentacao(setor);
@@ -266,9 +271,9 @@ export const Movimentacoes: React.FC = () => {
   };
 
   // Filtragem
+  const normalizedSearchTerm = normalizeSearch(searchTerm.trim());
   const filteredMovs = movimentacoes.filter(m => {
-    const normalizedSearchTerm = normalizeSearch(searchTerm.trim());
-    const matchesSearch = !normalizedSearchTerm || normalizeSearch(m.insumoNome || '').includes(normalizedSearchTerm);
+    const matchesSearch = !normalizedSearchTerm || normalizeSearch(getMovimentacaoNome(m)).includes(normalizedSearchTerm);
     const matchesType = selectedType === 'todos'
       || m.tipo === selectedType
       || (selectedType === 'saida' && m.tipo === 'ajuste' && m.quantidade < 0)
@@ -764,6 +769,7 @@ export const Movimentacoes: React.FC = () => {
                   
                   const estiloBadge = getTipoEstilo(m);
                   const ins = insumos.find(i => i.id === m.insumoId);
+                  const insumoNome = getMovimentacaoNome(m);
                   const sinal = getSinalSufixo(m);
 
                   return (
@@ -777,7 +783,7 @@ export const Movimentacoes: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-800">{m.insumoNome}</td>
+                      <td className="py-3.5 px-4 font-bold text-slate-800">{insumoNome}</td>
                       <td className="py-3.5 px-4 text-xs font-semibold text-slate-500">{getMovimentacaoSetor(m)}</td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${estiloBadge.bg}`}>
