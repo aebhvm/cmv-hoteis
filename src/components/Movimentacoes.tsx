@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
 import { Insumo, Movimentacao, SetorEstoque } from '../types';
@@ -48,6 +48,10 @@ const toLocalDateKey = (value: string | Date) => {
   const getPart = (type: string) => parts.find(part => part.type === type)?.value || "";
   return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
 };
+const formatQuantity = (value: number) => Number(value || 0).toLocaleString('pt-BR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 const toMovementIso = (dateKey: string, previousDate?: string) => {
   const base = previousDate ? new Date(previousDate) : new Date();
@@ -95,6 +99,20 @@ export const Movimentacoes: React.FC = () => {
   const normalizeSearch = (value: string) =>
     value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+  useEffect(() => {
+    if (!showForm || !editingMovId) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setShowForm(false);
+      setEditingMovId(null);
+      setShowInsumoSugestoes(false);
+      setSuggestionIndex(-1);
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [editingMovId, showForm]);
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const normalizedSearchTerm = useMemo(() => normalizeSearch(deferredSearchTerm.trim()), [deferredSearchTerm]);
   const insumosById = useMemo(() => new Map(insumos.map(insumo => [insumo.id, insumo])), [insumos]);
@@ -177,7 +195,7 @@ export const Movimentacoes: React.FC = () => {
     }
 
     if (!editingMovId && tipo !== 'entrada' && tipo !== 'ajuste' && ins.estoqueAtual < qty) {
-      setErrorMsg(`Estoque insuficiente! Estoque atual de ${ins.nome} é de ${ins.estoqueAtual} ${ins.unidadeMedida}.`);
+      setErrorMsg(`Estoque insuficiente! Estoque atual de ${ins.nome} é de ${formatQuantity(ins.estoqueAtual)} ${ins.unidadeMedida}.`);
       return;
     }
 
@@ -192,6 +210,7 @@ export const Movimentacoes: React.FC = () => {
       estoqueFisico: tipo === 'ajuste' ? qty : undefined
     };
 
+    const wasEditing = Boolean(editingMovId);
     const result = editingMovId ? updateMovimentacao(editingMovId, payload) : (addMovimentacao(payload), { success: true });
     if (!result.success) {
       setErrorMsg(result.error || 'Erro ao salvar movimentacao.');
@@ -206,6 +225,7 @@ export const Movimentacoes: React.FC = () => {
     setCustoUnitario('');
     setObservacao('');
     setEditingMovId(null);
+    if (wasEditing) setShowForm(false);
     setSetorMovimentacao(setorAtivo === 'Todos' ? SETOR_RESTAURANTE : setorAtivo);
     setErrorMsg('');
     setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');
@@ -213,6 +233,12 @@ export const Movimentacoes: React.FC = () => {
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingMovId(null);
+    setShowInsumoSugestoes(false);
+    setSuggestionIndex(-1);
+  };
 
   const handleOpenCreate = (initialType: 'entrada' | 'saida' | 'desperdicio' = 'entrada') => {
     setEditingMovId(null);
@@ -456,15 +482,26 @@ export const Movimentacoes: React.FC = () => {
 
       {/* Formulário de Registro de Movimentação */}
       {showForm && (
-        <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-md animate-fadeIn" id="mov-form">
+        <div
+          className={editingMovId ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 overflow-y-auto' : 'block'}
+          role={editingMovId ? 'dialog' : undefined}
+          aria-modal={editingMovId ? true : undefined}
+          aria-labelledby={editingMovId ? 'mov-form-title' : undefined}
+          onMouseDown={editingMovId ? (event) => {
+            if (event.target === event.currentTarget) closeForm();
+          } : undefined}
+        >
+        <div className={`bg-white border border-slate-200 p-6 rounded-xl shadow-md animate-fadeIn ${editingMovId ? 'w-full max-w-4xl max-h-[calc(100vh-3rem)] overflow-y-auto' : ''}`} id="mov-form">
           <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <h3 id="mov-form-title" className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-brand-navy" />
-              Lançar Novo Registro de Estoque
+              {editingMovId ? 'Corrigir Movimentação' : 'Lançar Novo Registro de Estoque'}
             </h3>
             <button 
-              onClick={() => { setShowForm(false); setEditingMovId(null); }}
+              onClick={closeForm}
               className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              type="button"
+              aria-label="Fechar formulário de movimentação"
             >
               <X className="w-4 h-4" />
             </button>
@@ -475,6 +512,7 @@ export const Movimentacoes: React.FC = () => {
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tipo de Lançamento *</label>
               <select
                 value={tipo}
+                autoFocus={Boolean(editingMovId)}
                 onChange={(e) => {
                   setTipo(e.target.value as any);
                 }}
@@ -576,7 +614,7 @@ export const Movimentacoes: React.FC = () => {
                         >
                           <span className="block text-xs font-bold text-slate-800 break-words">{ins.nome}</span>
                           <span className="block text-[10px] text-slate-500 font-mono">
-                            Estoque: {ins.estoqueAtual} {ins.unidadeMedida} - Custo: R$ {ins.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                            Estoque: {formatQuantity(ins.estoqueAtual)} {ins.unidadeMedida} - Custo: R$ {formatMoney(ins.custoMedio)}
                           </span>
                         </button>
                       ))
@@ -612,7 +650,7 @@ export const Movimentacoes: React.FC = () => {
                 </div>
                 {tipo === 'ajuste' && insumoId && (
                   <span className="mt-1 block text-[9px] font-medium text-slate-400">
-                    Estoque teórico atual: {insumosById.get(insumoId)?.estoqueAtual ?? 0}
+                    Estoque teórico atual: {formatQuantity(insumosById.get(insumoId)?.estoqueAtual ?? 0)}
                   </span>
                 )}
               </div>
@@ -654,7 +692,7 @@ export const Movimentacoes: React.FC = () => {
             <div className="md:col-span-6 flex justify-end gap-2 pt-2 border-t border-slate-150 mt-2">
               <button
                 type="button"
-                onClick={() => { setShowForm(false); setEditingMovId(null); }}
+                onClick={closeForm}
                 className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
               >
                 Cancelar
@@ -663,10 +701,11 @@ export const Movimentacoes: React.FC = () => {
                 type="submit"
                 className="px-5 py-1.5 bg-brand-navy hover:bg-brand-navy/90 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-sm"
               >
-                Gravar Lançamento
+                {editingMovId ? 'Salvar Correção' : 'Gravar Lançamento'}
               </button>
             </div>
           </form>
+        </div>
         </div>
       )}
 
@@ -801,7 +840,7 @@ export const Movimentacoes: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-medium">
                         <span className={m.tipo === 'desperdicio' || (m.tipo === 'ajuste' && m.quantidade < 0) ? 'text-rose-600 font-semibold' : m.tipo === 'entrada' || (m.tipo === 'ajuste' && m.quantidade > 0) ? 'text-emerald-600 font-semibold' : 'text-slate-700'}>
-                          {sinal}{m.quantidade.toFixed(2)}
+                          {sinal}{formatQuantity(m.quantidade)}
                         </span>{' '}
                         <span className="text-[10px] text-slate-400 uppercase">{ins?.unidadeMedida || ''}</span>
                       </td>
