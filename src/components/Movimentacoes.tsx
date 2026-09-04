@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useDeferredValue, useMemo, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
 import { Insumo, Movimentacao, SetorEstoque } from '../types';
@@ -95,26 +95,29 @@ export const Movimentacoes: React.FC = () => {
   const normalizeSearch = (value: string) =>
     value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const normalizedSearchTerm = useMemo(() => normalizeSearch(deferredSearchTerm.trim()), [deferredSearchTerm]);
+  const insumosById = useMemo(() => new Map(insumos.map(insumo => [insumo.id, insumo])), [insumos]);
   const setorProdutos = showForm ? setorMovimentacao : setorAtivo;
-  const insumosDoSetor = setorProdutos === 'Todos'
+  const insumosDoSetor = useMemo(() => setorProdutos === 'Todos'
     ? insumos
-    : insumos.filter(ins => getInsumoSetor(ins) === setorProdutos);
+    : insumos.filter(ins => getInsumoSetor(ins) === setorProdutos), [insumos, setorProdutos]);
 
   const getMovimentacaoSetor = (mov: Movimentacao): SetorEstoque => {
     if (mov.setor === SETOR_CAFE || mov.setor === SETOR_RESTAURANTE) return mov.setor;
-    const insumo = insumos.find(item => item.id === mov.insumoId);
+    const insumo = insumosById.get(mov.insumoId);
     return insumo ? getInsumoSetor(insumo) : SETOR_RESTAURANTE;
   };
 
   // O nome gravado na movimentacao pode ser antigo. O cadastro vinculado pelo
   // ID e a fonte principal para que o filtro e a tabela usem o mesmo produto.
   const getMovimentacaoNome = (mov: Movimentacao) =>
-    insumos.find(item => item.id === mov.insumoId)?.nome || mov.insumoNome || '';
+    insumosById.get(mov.insumoId)?.nome || mov.insumoNome || '';
 
   const handleSetorChange = (setor: 'Todos' | SetorEstoque) => {
     setSetorAtivo(setor);
     if (setor !== 'Todos') setSetorMovimentacao(setor);
-    const selectedInsumo = insumos.find(item => item.id === insumoId);
+    const selectedInsumo = insumosById.get(insumoId);
     if (setor !== 'Todos' && selectedInsumo && getInsumoSetor(selectedInsumo) !== setor) {
       setInsumoId('');
       setInsumoSearchTerm('');
@@ -123,15 +126,17 @@ export const Movimentacoes: React.FC = () => {
     }
   };
 
-  const insumoSugestoes = insumoSearchTerm.trim()
-    ? [...insumosDoSetor]
-        .filter(ins => normalizeSearch(ins.nome).includes(normalizeSearch(insumoSearchTerm)))
-        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-        .slice(0, 8)
-    : [];
+  const insumoSugestoes = useMemo(() => {
+    const normalizedTerm = normalizeSearch(insumoSearchTerm.trim());
+    if (!normalizedTerm) return [];
+    return [...insumosDoSetor]
+      .filter(ins => normalizeSearch(ins.nome).includes(normalizedTerm))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      .slice(0, 8);
+  }, [insumoSearchTerm, insumosDoSetor]);
 
   const handleSelectInsumo = (selectedId: string) => {
-    const ins = insumos.find(item => item.id === selectedId);
+    const ins = insumosById.get(selectedId);
     if (!ins) return;
     setInsumoId(ins.id);
     setInsumoSearchTerm(ins.nome);
@@ -153,7 +158,7 @@ export const Movimentacoes: React.FC = () => {
       return;
     }
 
-    const ins = insumos.find(i => i.id === insumoId);
+    const ins = insumosById.get(insumoId);
     if (!ins) {
       setErrorMsg('Insumo inválido.');
       return;
@@ -230,12 +235,12 @@ export const Movimentacoes: React.FC = () => {
       return;
     }
     const quantidadeEdicao = mov.tipo === 'ajuste'
-      ? mov.estoqueFinal ?? insumos.find(item => item.id === mov.insumoId)?.estoqueAtual ?? Math.max(0, mov.quantidade)
+      ? mov.estoqueFinal ?? insumosById.get(mov.insumoId)?.estoqueAtual ?? Math.max(0, mov.quantidade)
       : mov.quantidade;
 
     setEditingMovId(id);
     setInsumoId(mov.insumoId);
-    setInsumoSearchTerm(insumos.find(item => item.id === mov.insumoId)?.nome || mov.insumoNome);
+    setInsumoSearchTerm(insumosById.get(mov.insumoId)?.nome || mov.insumoNome);
     setSetorMovimentacao(getMovimentacaoSetor(mov));
     setShowInsumoSugestoes(false);
     setTipo(mov.tipo);
@@ -271,8 +276,7 @@ export const Movimentacoes: React.FC = () => {
   };
 
   // Filtragem
-  const normalizedSearchTerm = normalizeSearch(searchTerm.trim());
-  const filteredMovs = movimentacoes.filter(m => {
+  const filteredMovs = useMemo(() => movimentacoes.filter(m => {
     const matchesSearch = !normalizedSearchTerm || normalizeSearch(getMovimentacaoNome(m)).includes(normalizedSearchTerm);
     const matchesType = selectedType === 'todos'
       || m.tipo === selectedType
@@ -281,30 +285,35 @@ export const Movimentacoes: React.FC = () => {
     const matchesDate = !selectedDate || toLocalDateKey(m.data) === selectedDate;
     const matchesSector = setorAtivo === 'Todos' || getMovimentacaoSetor(m) === setorAtivo;
     return matchesSearch && matchesType && matchesDate && matchesSector;
-  }).sort((a, b) => (parseMovementDate(b.data)?.getTime() || 0) - (parseMovementDate(a.data)?.getTime() || 0));
+  }).sort((a, b) => (parseMovementDate(b.data)?.getTime() || 0) - (parseMovementDate(a.data)?.getTime() || 0)),
+  [insumosById, movimentacoes, normalizedSearchTerm, selectedDate, selectedType, setorAtivo]);
 
-  const groupedMovs = filteredMovs.reduce<Array<{ dateKey: string; items: typeof filteredMovs }>>((groups, mov) => {
+  const groupedMovs = useMemo(() => filteredMovs.reduce<Array<{ dateKey: string; items: typeof filteredMovs }>>((groups, mov) => {
     const dateKey = toLocalDateKey(mov.data);
     const lastGroup = groups[groups.length - 1];
     if (lastGroup?.dateKey === dateKey) lastGroup.items.push(mov);
     else groups.push({ dateKey, items: [mov] });
     return groups;
-  }, []);
+  }, []), [filteredMovs]);
 
-  const movimentosDaData = filteredMovs;
-  const totalEntradasR$ = movimentosDaData
-    .filter(m => m.tipo === 'entrada' || (m.tipo === 'ajuste' && m.quantidade > 0))
-    .reduce((acc, m) => acc + m.custoTotal, 0);
-
-  const totalDesperdicioR$ = movimentosDaData
-    .filter(m => m.tipo === 'desperdicio')
-    .reduce((acc, m) => acc + m.custoTotal, 0);
+  const { totalEntradasR$, totalDesperdicioR$, totalSelecionadoR$ } = useMemo(() => {
+    let totalEntradasR$ = 0;
+    let totalDesperdicioR$ = 0;
+    let totalSelecionadoR$ = 0;
+    filteredMovs.forEach(mov => {
+      totalSelecionadoR$ += mov.custoTotal;
+      if (mov.tipo === 'entrada' || (mov.tipo === 'ajuste' && mov.quantidade > 0)) {
+        totalEntradasR$ += mov.custoTotal;
+      }
+      if (mov.tipo === 'desperdicio') totalDesperdicioR$ += mov.custoTotal;
+    });
+    return { totalEntradasR$, totalDesperdicioR$, totalSelecionadoR$ };
+  }, [filteredMovs]);
   const selectedDateLabel = selectedDate
     ? new Date(`${selectedDate}T12:00:00`).toLocaleDateString('pt-BR')
     : 'Todo o período';
 
   const selectedTypeLabel = selectedType === 'entrada' ? 'Entradas' : selectedType === 'saida' ? 'Sa\u00eddas' : selectedType === 'desperdicio' ? 'Desperd\u00edcio' : selectedType === 'ajuste' ? 'Ajustes' : 'Entradas';
-  const totalSelecionadoR$ = movimentosDaData.reduce((acc, m) => acc + m.custoTotal, 0);
   const totalResumoPrincipalR$ = selectedType === 'todos' ? totalEntradasR$ : totalSelecionadoR$;
 
   const getTipoEstilo = (mov: Movimentacao) => {
@@ -597,13 +606,13 @@ export const Movimentacoes: React.FC = () => {
                   />
                   {insumoId && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 uppercase font-bold">
-                      {insumos.find(i => i.id === insumoId)?.unidadeMedida}
+                      {insumosById.get(insumoId)?.unidadeMedida}
                     </span>
                   )}
                 </div>
                 {tipo === 'ajuste' && insumoId && (
                   <span className="mt-1 block text-[9px] font-medium text-slate-400">
-                    Estoque teórico atual: {insumos.find(i => i.id === insumoId)?.estoqueAtual ?? 0}
+                    Estoque teórico atual: {insumosById.get(insumoId)?.estoqueAtual ?? 0}
                   </span>
                 )}
               </div>
@@ -768,7 +777,7 @@ export const Movimentacoes: React.FC = () => {
                     : '--:--';
                   
                   const estiloBadge = getTipoEstilo(m);
-                  const ins = insumos.find(i => i.id === m.insumoId);
+                  const ins = insumosById.get(m.insumoId);
                   const insumoNome = getMovimentacaoNome(m);
                   const sinal = getSinalSufixo(m);
 
