@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
 import { Insumo, Movimentacao, SetorEstoque } from '../types';
@@ -68,42 +68,6 @@ const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
   if (insumo.setor === SETOR_CAFE || insumo.setor === SETOR_RESTAURANTE) return insumo.setor;
   return insumo.categoria === SETOR_CAFE ? SETOR_CAFE : SETOR_RESTAURANTE;
 };
-
-const getMovementSector = (mov: Movimentacao, insumosById: Map<string, Insumo>): SetorEstoque => {
-  if (mov.setor === SETOR_CAFE || mov.setor === SETOR_RESTAURANTE) return mov.setor;
-  return insumosById.get(mov.insumoId)
-    ? getInsumoSetor(insumosById.get(mov.insumoId) as Insumo)
-    : SETOR_RESTAURANTE;
-};
-
-const getMovementName = (mov: Movimentacao, insumosById: Map<string, Insumo>) =>
-  insumosById.get(mov.insumoId)?.nome || mov.insumoNome || '';
-
-const getMovementTypeStyle = (mov: Movimentacao) => {
-  if (mov.tipo === 'ajuste' && mov.quantidade < 0) {
-    return { text: 'Saída de ajuste', bg: 'bg-rose-50 text-rose-700 border border-rose-200/60 font-bold' };
-  }
-  if (mov.tipo === 'ajuste' && mov.quantidade > 0) {
-    return { text: 'Entrada de ajuste', bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' };
-  }
-  switch (mov.tipo) {
-    case 'entrada':
-      return { text: 'Entrada / Compra', bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' };
-    case 'saida':
-      return { text: 'Saída / Consumo', bg: 'bg-brand-navy/5 text-brand-navy border border-brand-navy/10 font-medium' };
-    case 'desperdicio':
-      return { text: 'Desperdício', bg: 'bg-rose-50 text-rose-700 border border-rose-200/60 font-bold' };
-    default:
-      return { text: 'Ajuste Físico', bg: 'bg-amber-50 text-amber-700 border border-amber-200/60' };
-  }
-};
-
-const getMovementSign = (mov: Movimentacao) => {
-  if (mov.tipo === 'entrada' || (mov.tipo === 'ajuste' && mov.quantidade > 0)) return '+';
-  if (mov.tipo === 'saida' || mov.tipo === 'desperdicio') return '-';
-  return '';
-};
-
 export const Movimentacoes: React.FC = () => {
   const { user, movimentacoes, insumos, addMovimentacao, updateMovimentacao, deleteMovimentacao } = useStock();
   const isColaborador = user.cargo === 'Colaborador';
@@ -152,21 +116,10 @@ export const Movimentacoes: React.FC = () => {
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const normalizedSearchTerm = useMemo(() => normalizeSearch(deferredSearchTerm.trim()), [deferredSearchTerm]);
   const insumosById = useMemo(() => new Map(insumos.map(insumo => [insumo.id, insumo])), [insumos]);
-  const movimentacoesById = useMemo(() => new Map(movimentacoes.map(mov => [mov.id, mov])), [movimentacoes]);
   const setorProdutos = showForm ? setorMovimentacao : setorAtivo;
   const insumosDoSetor = useMemo(() => setorProdutos === 'Todos'
     ? insumos
     : insumos.filter(ins => getInsumoSetor(ins) === setorProdutos), [insumos, setorProdutos]);
-  const deferredInsumoSearchTerm = useDeferredValue(insumoSearchTerm);
-  const normalizedInsumoSearchTerm = useMemo(
-    () => normalizeSearch(deferredInsumoSearchTerm.trim()),
-    [deferredInsumoSearchTerm]
-  );
-  const insumosDoSetorIndex = useMemo(() => [...insumosDoSetor]
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-    .map(insumo => ({ insumo, normalizedName: normalizeSearch(insumo.nome) })),
-    [insumosDoSetor]
-  );
 
   const getMovimentacaoSetor = (mov: Movimentacao): SetorEstoque => {
     if (mov.setor === SETOR_CAFE || mov.setor === SETOR_RESTAURANTE) return mov.setor;
@@ -192,12 +145,13 @@ export const Movimentacoes: React.FC = () => {
   };
 
   const insumoSugestoes = useMemo(() => {
-    if (!normalizedInsumoSearchTerm) return [];
-    return insumosDoSetorIndex
-      .filter(item => item.normalizedName.includes(normalizedInsumoSearchTerm))
-      .slice(0, 8)
-      .map(item => item.insumo);
-  }, [insumosDoSetorIndex, normalizedInsumoSearchTerm]);
+    const normalizedTerm = normalizeSearch(insumoSearchTerm.trim());
+    if (!normalizedTerm) return [];
+    return [...insumosDoSetor]
+      .filter(ins => normalizeSearch(ins.nome).includes(normalizedTerm))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      .slice(0, 8);
+  }, [insumoSearchTerm, insumosDoSetor]);
 
   const handleSelectInsumo = (selectedId: string) => {
     const ins = insumosById.get(selectedId);
@@ -245,7 +199,7 @@ export const Movimentacoes: React.FC = () => {
       return;
     }
 
-    const originalMov = editingMovId ? movimentacoesById.get(editingMovId) : undefined;
+    const originalMov = editingMovId ? movimentacoes.find(m => m.id === editingMovId) : undefined;
     const payload = {
       insumoId,
       tipo,
@@ -299,8 +253,8 @@ export const Movimentacoes: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleOpenEdit = useCallback((id: string) => {
-    const mov = movimentacoesById.get(id);
+  const handleOpenEdit = (id: string) => {
+    const mov = movimentacoes.find(m => m.id === id);
     if (!mov) return;
     if (isColaborador && mov.tipo === 'ajuste') {
       setErrorMsg('Ajustes de estoque são exclusivos do Gestor.');
@@ -322,10 +276,10 @@ export const Movimentacoes: React.FC = () => {
     setErrorMsg('');
     setDataMovimentacao(toLocalDateKey(mov.data));
     setShowForm(true);
-  }, [insumosById, isColaborador, movimentacoesById]);
+  };
 
-  const handleDeleteMov = useCallback((id: string) => {
-    const mov = movimentacoesById.get(id);
+  const handleDeleteMov = (id: string) => {
+    const mov = movimentacoes.find(m => m.id === id);
     if (!mov) return;
     if (isColaborador && mov.tipo === 'ajuste') {
       setErrorMsg('Ajustes de estoque são exclusivos do Gestor.');
@@ -345,7 +299,7 @@ export const Movimentacoes: React.FC = () => {
       setErrorMsg(result.error || 'Erro ao excluir movimentacao.');
       setSuccessMsg('');
     }
-  }, [deleteMovimentacao, editingMovId, isColaborador, movimentacoesById]);
+  };
 
   // Filtragem
   const filteredMovs = useMemo(() => movimentacoes.filter(m => {
@@ -388,94 +342,48 @@ export const Movimentacoes: React.FC = () => {
   const selectedTypeLabel = selectedType === 'entrada' ? 'Entradas' : selectedType === 'saida' ? 'Sa\u00eddas' : selectedType === 'desperdicio' ? 'Desperd\u00edcio' : selectedType === 'ajuste' ? 'Ajustes' : 'Entradas';
   const totalResumoPrincipalR$ = selectedType === 'todos' ? totalEntradasR$ : totalSelecionadoR$;
 
-  const movementRows = useMemo(() => (
-    groupedMovs.map(group => (
-                  <React.Fragment key={group.dateKey}>
-                    <tr className="bg-slate-50/80 border-y border-slate-200">
-                      <td colSpan={9} className="px-4 py-2">
-                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                          <Calendar className="w-3.5 h-3.5 text-brand-navy" />
-                          {new Date(`${group.dateKey}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-                          <span className="text-slate-400">({group.items.length})</span>
-                        </div>
-                      </td>
-                    </tr>
-                    {group.items.map(m => {
-                  const dataObj = parseMovementDate(m.data);
-                  const dataFormatada = dataObj
-                    ? dataObj.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE })
-                    : 'Data inválida';
-                  const horaFormatada = dataObj
-                    ? dataObj.toLocaleTimeString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, hour: '2-digit', minute: '2-digit' })
-                    : '--:--';
+  const getTipoEstilo = (mov: Movimentacao) => {
+    if (mov.tipo === 'ajuste' && mov.quantidade < 0) {
+      return { text: 'Saída de ajuste', bg: 'bg-rose-50 text-rose-700 border border-rose-200/60 font-bold' };
+    }
+    if (mov.tipo === 'ajuste' && mov.quantidade > 0) {
+      return { text: 'Entrada de ajuste', bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' };
+    }
+    const tipo = mov.tipo;
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200" role="tablist" aria-label="Setor das movimentações">
+        {SETOR_TABS.map(setor => (
+          <button
+            key={setor}
+            type="button"
+            role="tab"
+            aria-selected={setorAtivo === setor}
+            onClick={() => handleSetorChange(setor)}
+            className={setorAtivo === setor ? 'whitespace-nowrap border-b-2 border-brand-navy px-4 py-2.5 text-xs font-bold text-brand-navy' : 'whitespace-nowrap border-b-2 border-transparent px-4 py-2.5 text-xs font-bold text-slate-400 hover:border-slate-300 hover:text-slate-700'}
+          >
+            {setor}
+          </button>
+        ))}
+      </div>
 
-                  const estiloBadge = getMovementTypeStyle(m);
-                  const ins = insumosById.get(m.insumoId);
-                  const insumoNome = getMovementName(m, insumosById);
-                  const sinal = getMovementSign(m);
+    switch(tipo) {
+      case 'entrada': 
+        return { text: 'Entrada / Compra', bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' };
+      case 'saida': 
+        return { text: 'Saída / Consumo', bg: 'bg-brand-navy/5 text-brand-navy border border-brand-navy/10 font-medium' };
+      case 'desperdicio': 
+        return { text: 'Desperdício', bg: 'bg-rose-50 text-rose-700 border border-rose-200/60 font-bold' };
+      case 'ajuste': 
+        return { text: 'Ajuste Físico', bg: 'bg-amber-50 text-amber-700 border border-amber-200/60' };
+      default: 
+        return { text: tipo, bg: 'bg-slate-50 text-slate-700 border border-slate-200' };
+    }
+  };
 
-                  return (
-                    <tr key={m.id} className="hover:bg-slate-50/30 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <div>
-                            <span className="font-semibold text-slate-700 block">{dataFormatada}</span>
-                            <span className="text-[10px] font-mono">{horaFormatada}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-800">{insumoNome}</td>
-                      <td className="py-3.5 px-4 text-xs font-semibold text-slate-500">{getMovementSector(m, insumosById)}</td>
-                      <td className="py-3.5 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${estiloBadge.bg}`}>
-                          {estiloBadge.text}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-medium">
-                        <span className={m.tipo === 'desperdicio' || (m.tipo === 'ajuste' && m.quantidade < 0) ? 'text-rose-600 font-semibold' : m.tipo === 'entrada' || (m.tipo === 'ajuste' && m.quantidade > 0) ? 'text-emerald-600 font-semibold' : 'text-slate-700'}>
-                          {sinal}{formatQuantity(m.quantidade)}
-                        </span>{' '}
-                        <span className="text-[10px] text-slate-400 uppercase">{ins?.unidadeMedida || ''}</span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-slate-400">
-                        {m.custoUnitario ? `R$ ${formatMoney(m.custoUnitario)}` : '-'}
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-800">
-                        R$ {m.custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-400 max-w-xs truncate" title={m.observacao}>
-                        {m.observacao || <span className="text-slate-300 italic">Sem observações</span>}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center sticky right-0 bg-white shadow-[-8px_0_12px_rgba(15,23,42,0.04)]">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(m.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-brand-navy"
-                            title="Editar movimentacao"
-                            aria-label="Editar movimentacao"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMov(m.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-600 shadow-sm transition-all hover:bg-rose-100"
-                            title="Excluir movimentacao"
-                            aria-label="Excluir movimentacao"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                    })}
-                  </React.Fragment>
-                ))
-  ), [groupedMovs, insumosById, handleOpenEdit, handleDeleteMov]);
+  const getSinalSufixo = (mov: Movimentacao) => {
+    if (mov.tipo === 'entrada' || (mov.tipo === 'ajuste' && mov.quantidade > 0)) return '+';
+    if (mov.tipo === 'saida' || mov.tipo === 'desperdicio') return '-';
+    return '';
+  };
 
   return (
     <div className="space-y-6" id="movimentacoes-view">
@@ -887,7 +795,92 @@ export const Movimentacoes: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                {movementRows}
+                groupedMovs.map(group => (
+                  <React.Fragment key={group.dateKey}>
+                    <tr className="bg-slate-50/80 border-y border-slate-200">
+                      <td colSpan={9} className="px-4 py-2">
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                          <Calendar className="w-3.5 h-3.5 text-brand-navy" />
+                          {new Date(`${group.dateKey}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                          <span className="text-slate-400">({group.items.length})</span>
+                        </div>
+                      </td>
+                    </tr>
+                    {group.items.map(m => {
+                  const dataObj = parseMovementDate(m.data);
+                  const dataFormatada = dataObj
+                    ? dataObj.toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE })
+                    : 'Data inválida';
+                  const horaFormatada = dataObj
+                    ? dataObj.toLocaleTimeString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, hour: '2-digit', minute: '2-digit' })
+                    : '--:--';
+                  
+                  const estiloBadge = getTipoEstilo(m);
+                  const ins = insumosById.get(m.insumoId);
+                  const insumoNome = getMovimentacaoNome(m);
+                  const sinal = getSinalSufixo(m);
+
+                  return (
+                    <tr key={m.id} className="hover:bg-slate-50/30 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <div>
+                            <span className="font-semibold text-slate-700 block">{dataFormatada}</span>
+                            <span className="text-[10px] font-mono">{horaFormatada}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-slate-800">{insumoNome}</td>
+                      <td className="py-3.5 px-4 text-xs font-semibold text-slate-500">{getMovimentacaoSetor(m)}</td>
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${estiloBadge.bg}`}>
+                          {estiloBadge.text}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-mono font-medium">
+                        <span className={m.tipo === 'desperdicio' || (m.tipo === 'ajuste' && m.quantidade < 0) ? 'text-rose-600 font-semibold' : m.tipo === 'entrada' || (m.tipo === 'ajuste' && m.quantidade > 0) ? 'text-emerald-600 font-semibold' : 'text-slate-700'}>
+                          {sinal}{formatQuantity(m.quantidade)}
+                        </span>{' '}
+                        <span className="text-[10px] text-slate-400 uppercase">{ins?.unidadeMedida || ''}</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-mono text-slate-400">
+                        {m.custoUnitario ? `R$ ${formatMoney(m.custoUnitario)}` : '-'}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-800">
+                        R$ {m.custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-400 max-w-xs truncate" title={m.observacao}>
+                        {m.observacao || <span className="text-slate-300 italic">Sem observações</span>}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center sticky right-0 bg-white shadow-[-8px_0_12px_rgba(15,23,42,0.04)]">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(m.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-brand-navy"
+                            title="Editar movimentacao"
+                            aria-label="Editar movimentacao"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMov(m.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-600 shadow-sm transition-all hover:bg-rose-100"
+                            title="Excluir movimentacao"
+                            aria-label="Excluir movimentacao"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                    })}
+                  </React.Fragment>
+                ))
               )}
             </tbody>
           </table>
