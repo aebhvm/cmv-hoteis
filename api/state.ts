@@ -254,16 +254,8 @@ export default async function handler(req: any, res: any) {
       const rows = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
       if (rows.length > 0) {
         const normalized = normalizeState(rows[0].data);
-        let revision = rows[0].revision;
-        if (JSON.stringify(normalized.allInsumos || []) !== JSON.stringify(rows[0].data.allInsumos || [])) {
-          const saved = await sql`
-            UPDATE app_state
-            SET data = ${JSON.stringify(normalized)}::jsonb, updated_at = now(), revision = revision + 1
-            WHERE id = ${APP_STATE_ID}
-            RETURNING revision
-          `;
-          revision = saved[0].revision;
-        }
+        // Reads must not overwrite concurrent sales with an older snapshot.
+        const revision = rows[0].revision;
         return res.status(200).json({ ...normalized, _revision: String(revision) });
       }
 

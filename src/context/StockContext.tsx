@@ -288,6 +288,10 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const latestSnapshotRef = useRef<AppStateSnapshot | null>(null);
   const syncInFlightRef = useRef(false);
   const syncQueuedRef = useRef(false);
+  const [remoteLoadStatus, setRemoteLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [syncStatus, setSyncStatus] = useState<'saved' | 'pending' | 'error'>('saved');
+  const [syncAttempt, setSyncAttempt] = useState(0);
 
   const picoleGenerationPendingRef = useRef(false);
   const [currentUnit, setCurrentUnitState] = useState<Unidade>(() => {
@@ -442,6 +446,7 @@ useEffect(() => {
             latestSnapshotRef.current = localSnapshot;
             remoteRevisionRef.current = localRevision;
             remoteStateReadyRef.current = true;
+            setRemoteLoadStatus('ready');
             return;
           }
         }
@@ -467,7 +472,9 @@ useEffect(() => {
         if (Array.isArray(data.allUtensilios)) setAllUtensilios(data.allUtensilios);
         if (Array.isArray(data.allMovimentacoesUtensilios)) setAllMovimentacoesUtensilios(data.allMovimentacoesUtensilios);
         remoteStateReadyRef.current = true;
+        setRemoteLoadStatus('ready');
       } catch {
+        if (active) setRemoteLoadStatus('error');
         // Keep local data for offline use. It must not overwrite the remote state.
       }
     };
@@ -476,7 +483,7 @@ useEffect(() => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     latestSnapshotRef.current = buildSnapshot();
@@ -511,7 +518,6 @@ useEffect(() => {
         if (response.status === 409) {
           const conflict = await response.json();
           remoteRevisionRef.current = conflict.state?._revision || null;
-          remoteBaseStateRef.current = snapshotFromRemote(conflict.state);
           response = await fetch('/api/state', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -524,28 +530,43 @@ useEffect(() => {
         const result = await response.json() as { _revision?: string; state?: Partial<AppStateSnapshot> & { _revision?: string } };
         const savedRevision = result.state?._revision || result._revision || remoteRevisionRef.current;
         remoteRevisionRef.current = savedRevision;
-        const syncedSnapshot = result.state ? snapshotFromRemote(result.state) : snapshot;
+        // Keep the baseline local: remote-only records are not local deletions.
+        const syncedSnapshot = snapshot;
         remoteBaseStateRef.current = syncedSnapshot;
         if (savedRevision) localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, savedRevision);
-        localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(syncedSnapshot));
+        // Reload must read the complete server state, including other sessions.
+        localStorage.removeItem(REMOTE_FINGERPRINT_STORAGE_KEY);
         saved = true;
+        setSyncStatus(statesMatch(snapshot, latestSnapshotRef.current) ? 'saved' : 'pending');
       } catch (error) {
+        setSyncStatus('error');
         console.error('Unable to save changes.', error);
       } finally {
         syncInFlightRef.current = false;
-        if (saved && syncQueuedRef.current) {
+        if (saved && (syncQueuedRef.current || !statesMatch(snapshot, latestSnapshotRef.current))) {
           syncQueuedRef.current = false;
           void syncChanges();
         }
       }
     };
 
+    if (!statesMatch(remoteBaseStateRef.current, latestSnapshotRef.current)) setSyncStatus('pending');
     const timer = window.setTimeout(() => {
       void syncChanges();
     }, SYNC_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios]);
+  }, [currentUnit, user, users, allInsumos, allFichas, allMovimentacoes, allVendas, allUtensilios, allMovimentacoesUtensilios, syncAttempt, remoteLoadStatus]);
+
+  useEffect(() => {
+    const warnPending = (event: BeforeUnloadEvent) => {
+      if (!remoteStateReadyRef.current || statesMatch(remoteBaseStateRef.current, latestSnapshotRef.current)) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnPending);
+    return () => window.removeEventListener('beforeunload', warnPending);
+  }, []);
 
   // Derived filtered state for current unit
   const insumos = allInsumos.filter(i => i.unidade === currentUnit);
@@ -1381,7 +1402,14 @@ useEffect(() => {
       registerUser,
       deleteUser
     }}>
-      {children}
+      {remoteLoadStatus === 'ready' ? <>
+        {syncStatus !== 'saved' && <div role="status" className="fixed bottom-4 right-4 z-[100] max-w-sm rounded-xl bg-amber-50 p-4 text-sm text-amber-900 shadow-lg">
+          {syncStatus === 'pending' ? 'Salvando alterações… Aguarde antes de fechar.' : <>Não foi possível salvar. Mantenha esta página aberta. <button type="button" className="font-bold underline" onClick={() => setSyncAttempt(value => value + 1)}>Tentar novamente</button></>}
+        </div>}
+        {children}
+      </> : <div role="status" className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-center text-slate-700">
+        {remoteLoadStatus === 'loading' ? 'Carregando os dados atualizados…' : <div>Não foi possível carregar os dados.<button type="button" className="ml-3 font-bold underline" onClick={() => { setRemoteLoadStatus('loading'); setLoadAttempt(value => value + 1); }}>Tentar novamente</button></div>}
+      </div>}
     </StockContext.Provider>
   );
 };
