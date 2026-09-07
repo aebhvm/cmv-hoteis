@@ -317,9 +317,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <StockProvider>
-      <AppContent />
+    <>
+      <StockProvider>
+        <AppContent />
+      </StockProvider>
       <InstallAppPrompt />
-    </StockProvider>
+    </>
   );
 }
