@@ -85,7 +85,7 @@ export const InstallAppPrompt: React.FC = () => {
 
       <div className="flex items-start gap-3 pr-6">
         <img
-          src="/icon-192.svg"
+          src="/icon-192.png"
           alt="Logo VM Hotéis"
           className="h-11 w-11 shrink-0 rounded-xl shadow-sm"
         />
