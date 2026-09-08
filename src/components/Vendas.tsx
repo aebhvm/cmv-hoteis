@@ -132,15 +132,23 @@ export const Vendas: React.FC = () => {
   const [dataLancamento, setDataLancamento] = useState(getTodayDateInputValue);
   const [editingVendaId, setEditingVendaId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [periodoSelecionado, setPeriodoSelecionado] = useState('todos');
+  const [periodoSelecionado, setPeriodoSelecionado] = useState(() => getBrasiliaMonthKey(new Date().toISOString()));
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const mesesDisponiveis: string[] = Array.from(new Set<string>(vendas.map(venda => getBrasiliaMonthKey(venda.data)).filter(Boolean)))
-    .sort((a, b) => b.localeCompare(a));
-  const vendasFiltradas = periodoSelecionado === 'todos'
+  const mesAtual = getBrasiliaMonthKey(new Date().toISOString());
+  const mesesDisponiveis: string[] = Array.from(new Set<string>([
+    mesAtual,
+    ...vendas.map(venda => getBrasiliaMonthKey(venda.data)),
+  ].filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  const vendasDoPeriodo = periodoSelecionado === 'todos'
     ? vendas
     : vendas.filter(venda => getBrasiliaMonthKey(venda.data) === periodoSelecionado);
+  const vendasFiltradas = [...vendasDoPeriodo].sort((a, b) => {
+    const dataA = new Date(a.data).getTime();
+    const dataB = new Date(b.data).getTime();
+    return (Number.isFinite(dataB) ? dataB : 0) - (Number.isFinite(dataA) ? dataA : 0);
+  });
   const faturamentoFiltrado = vendasFiltradas.reduce((acc, venda) => acc + venda.receitaTotal, 0);
   const custoInsumosFiltrado = vendasFiltradas.reduce((acc, venda) => acc + venda.custoInsumosTotal, 0);
   const lucroFiltrado = faturamentoFiltrado - custoInsumosFiltrado;
