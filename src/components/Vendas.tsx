@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import type { FichaTecnica, Insumo } from '../types';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
 import {
@@ -58,9 +59,73 @@ const formatMonthLabel = (monthKey: string) => {
     year: 'numeric',
   });
 };
+const normalizeInsumoNome = (nome: string) => nome
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+const getInsumoStockKey = (insumo: Pick<Insumo, 'nome' | 'unidadeMedida'>) =>
+  `${normalizeInsumoNome(insumo.nome)}::${insumo.unidadeMedida}`;
+
+const getFichaEstoqueStatus = (
+  ficha: FichaTecnica,
+  insumosById: Map<string, Insumo>,
+  saldoPorNomeUnidade: Map<string, number>,
+) => {
+  let estoquePossivel = Infinity;
+  const necessidades = new Map<string, {
+    nome: string;
+    unidadeMedida: Insumo['unidadeMedida'];
+    quantidadePorPorcao: number;
+  }>();
+  const insumosFaltantes = new Set<string>();
+  const rendimento = ficha.rendimentoPorcoes || 1;
+
+  ficha.ingredientes.forEach(ingrediente => {
+    const insumo = insumosById.get(ingrediente.insumoId);
+    if (!insumo) {
+      insumosFaltantes.add('Insumo não cadastrado');
+      estoquePossivel = 0;
+      return;
+    }
+
+    const quantidadePorPorcao = ingrediente.quantidade / rendimento;
+    if (quantidadePorPorcao <= 0) return;
+
+    const key = getInsumoStockKey(insumo);
+    const necessidadeAtual = necessidades.get(key);
+    necessidades.set(key, {
+      nome: insumo.nome,
+      unidadeMedida: insumo.unidadeMedida,
+      quantidadePorPorcao: (necessidadeAtual?.quantidadePorPorcao || 0) + quantidadePorPorcao,
+    });
+  });
+
+  necessidades.forEach(necessidade => {
+    const disponivel = saldoPorNomeUnidade.get(getInsumoStockKey(necessidade)) || 0;
+    const disponibilidade = disponivel / necessidade.quantidadePorPorcao;
+    if (disponibilidade < estoquePossivel) estoquePossivel = disponibilidade;
+    if (disponibilidade + 1e-8 < 1) insumosFaltantes.add(necessidade.nome);
+  });
+
+  const maxVendasDisponiveis = Math.floor(estoquePossivel === Infinity ? 0 : estoquePossivel);
+  return {
+    maxVendasDisponiveis,
+    esgotado: maxVendasDisponiveis <= 0,
+    insumosFaltantes: Array.from(insumosFaltantes),
+  };
+};
 
 export const Vendas: React.FC = () => {
   const { fichas, registrarVenda, updateVenda, deleteVenda, vendas, insumos } = useStock();
+  const insumosById = new Map<string, Insumo>(insumos.map(insumo => [insumo.id, insumo]));
+  const saldoPorNomeUnidade = new Map<string, number>();
+  insumos.forEach(insumo => {
+    const key = getInsumoStockKey(insumo);
+    saldoPorNomeUnidade.set(key, (saldoPorNomeUnidade.get(key) || 0) + insumo.estoqueAtual);
+  });
 
   const [selectedFichaId, setSelectedFichaId] = useState<string | null>(null);
   const [quantidadeVenda, setQuantidadeVenda] = useState('1');
@@ -238,22 +303,8 @@ export const Vendas: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" id="cardapio-vendas-grid">
               {filteredFichas.map(ficha => {
-                let estoquePossivel = Infinity;
-                ficha.ingredientes.forEach(ingrediente => {
-                  const insumo = insumos.find(item => item.id === ingrediente.insumoId);
-                  if (insumo) {
-                    const quantidadePorPorcao = ingrediente.quantidade / (ficha.rendimentoPorcoes || 1);
-                    const disponibilidade = quantidadePorPorcao > 0
-                      ? insumo.estoqueAtual / quantidadePorPorcao
-                      : Infinity;
-                    if (disponibilidade < estoquePossivel) estoquePossivel = disponibilidade;
-                  } else {
-                    estoquePossivel = 0;
-                  }
-                });
-
-                const maxVendasDisponiveis = Math.floor(estoquePossivel === Infinity ? 0 : estoquePossivel);
-                const esgotado = maxVendasDisponiveis <= 0;
+                const { maxVendasDisponiveis, esgotado, insumosFaltantes } =
+                  getFichaEstoqueStatus(ficha, insumosById, saldoPorNomeUnidade);
 
                 return (
                   <button
@@ -291,9 +342,17 @@ export const Vendas: React.FC = () => {
                     <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-[11px]">
                       <span className="text-slate-400 font-semibold uppercase tracking-wider text-[9px]">Estoque Estimado</span>
                       {esgotado ? (
-                        <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 font-bold text-[9px]">
-                          Indisponível (Sem Insumos)
-                        </span>
+                        <div className="flex min-w-0 flex-col items-end gap-1 text-right">
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 font-bold text-[9px]">
+                            Indisponível
+                          </span>
+                          <span
+                            className="max-w-[190px] line-clamp-2 text-[10px] font-semibold leading-3.5 text-rose-600"
+                            title={`Faltando: ${insumosFaltantes.join(', ') || 'insumo sem saldo suficiente'}`}
+                          >
+                            Faltando: {insumosFaltantes.join(', ') || 'insumo sem saldo suficiente'}
+                          </span>
+                        </div>
                       ) : (
                         <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold text-[10px] font-mono">
                           {maxVendasDisponiveis} porções
