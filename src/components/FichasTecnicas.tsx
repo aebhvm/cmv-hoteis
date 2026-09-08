@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
 import { FichaTecnica, IngredienteFicha, Insumo } from '../types';
@@ -44,6 +44,7 @@ export const FichasTecnicas: React.FC = () => {
   const [selectedInsumoId, setSelectedInsumoId] = useState('');
   const [insumoSearchTerm, setInsumoSearchTerm] = useState('');
   const [showInsumoSugestoes, setShowInsumoSugestoes] = useState(false);
+  const insumoInputRef = useRef<HTMLInputElement>(null);
   const [quantidadeInput, setQuantidadeInput] = useState('');
   const [unidadeInserida, setUnidadeInserida] = useState<'principal' | 'sub'>('sub'); // ex: principal = kg, sub = g
   const [editingIngredienteId, setEditingIngredienteId] = useState<string | null>(null);
@@ -139,6 +140,13 @@ export const FichasTecnicas: React.FC = () => {
     setQuantidadeInput('');
     setEditingIngredienteId(null);
     setErrorMsg('');
+  };
+
+  const handleAddIngredientePorEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    handleAddIngredienteAoForm();
+    window.requestAnimationFrame(() => insumoInputRef.current?.focus());
   };
 
   const handleEditarIngredienteDoForm = (ing: IngredienteFicha) => {
@@ -427,6 +435,7 @@ export const FichasTecnicas: React.FC = () => {
                   <div className="relative">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
+                      ref={insumoInputRef}
                       type="text"
                       value={insumoSearchTerm}
                       onChange={(e) => {
@@ -437,6 +446,7 @@ export const FichasTecnicas: React.FC = () => {
                       }}
                       onFocus={() => setShowInsumoSugestoes(true)}
                       onBlur={() => window.setTimeout(() => setShowInsumoSugestoes(false), 120)}
+                      onKeyDown={handleAddIngredientePorEnter}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-medium"
                       placeholder="Digite o nome do insumo..."
                       autoComplete="off"
@@ -474,6 +484,7 @@ export const FichasTecnicas: React.FC = () => {
                       type="number"
                       step="any"
                       value={quantidadeInput}
+                      onKeyDown={handleAddIngredientePorEnter}
                       onChange={(e) => setQuantidadeInput(e.target.value)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                       placeholder="Qtd"
