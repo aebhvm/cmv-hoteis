@@ -69,6 +69,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
   // Estado para entrada rápida de estoque
   const [quickAddId, setQuickAddId] = useState<string | null>(null);
   const quickQuantityInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [quickQty, setQuickQty] = useState('');
   const [quickCost, setQuickCost] = useState('');
   const [quickObs, setQuickObs] = useState('');
@@ -220,6 +221,8 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
     setQuickQty('');
     setQuickCost('');
     setQuickObs('');
+    setSearchTerm('');
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
     setSuccessMsg(`Entrada de estoque de ${ins.nome} realizada com sucesso!`);
     setTimeout(() => setSuccessMsg(''), 3000);
   };
@@ -341,6 +344,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
         <div className="flex-1 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Pesquisar insumo ou fornecedor..."
             value={searchTerm}
