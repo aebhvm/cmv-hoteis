@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
 import { Insumo, SetorEstoque } from '../types';
@@ -68,10 +68,15 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
 
   // Estado para entrada rápida de estoque
   const [quickAddId, setQuickAddId] = useState<string | null>(null);
+  const quickQuantityInputRef = useRef<HTMLInputElement>(null);
   const [quickQty, setQuickQty] = useState('');
   const [quickCost, setQuickCost] = useState('');
   const [quickObs, setQuickObs] = useState('');
 
+  useEffect(() => {
+    if (!quickAddId) return;
+    window.requestAnimationFrame(() => quickQuantityInputRef.current?.focus());
+  }, [quickAddId]);
   // Categorias disponíveis
   const categorias = ['Carnes e Peixes', 'Laticínios', 'Hortifruti', 'Secos e Mercearia', 'Bebidas', 'Embalagens', 'Picolé', 'Outros'];
 
@@ -572,6 +577,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
               <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Quantidade Adquirida *</label>
               <div className="relative">
                 <input
+                  ref={quickQuantityInputRef}
                   type="number"
                   step="any"
                   required
