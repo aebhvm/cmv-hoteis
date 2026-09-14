@@ -240,7 +240,8 @@ export const Movimentacoes: React.FC = () => {
       return;
     }
 
-    if (!editingMovId && tipo !== 'entrada' && tipo !== 'ajuste' && ins.estoqueAtual < qty) {
+    const excedeEstoque = qty - ins.estoqueAtual > 1e-8;
+    if (!editingMovId && tipo !== 'entrada' && tipo !== 'ajuste' && excedeEstoque) {
       setErrorMsg(`Estoque insuficiente! Estoque atual de ${ins.nome} é de ${formatQuantity(ins.estoqueAtual)} ${ins.unidadeMedida}.`);
       return;
     }

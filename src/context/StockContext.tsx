@@ -769,7 +769,7 @@ useEffect(() => {
 
     const insumosAfetados = new Set([original.insumoId, updatedMov.insumoId]);
     const estoqueNegativo = estoquePrevisto.find(ins =>
-      insumosAfetados.has(ins.id) && ins.estoqueAtual < 0
+      insumosAfetados.has(ins.id) && ins.estoqueAtual < -1e-8
     );
     if (estoqueNegativo) {
       return { success: false, error: `A alteracao deixaria o estoque de ${estoqueNegativo.nome} negativo.` };
@@ -794,7 +794,7 @@ useEffect(() => {
     });
 
     const estoqueNegativo = estoquePrevisto.find(ins =>
-      ins.id === original.insumoId && ins.estoqueAtual < 0
+      ins.id === original.insumoId && ins.estoqueAtual < -1e-8
     );
     if (estoqueNegativo) {
       return { success: false, error: `A exclusao deixaria o estoque de ${estoqueNegativo.nome} negativo.` };
