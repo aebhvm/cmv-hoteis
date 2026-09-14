@@ -767,7 +767,10 @@ useEffect(() => {
       return { ...ins, estoqueAtual };
     });
 
-    const estoqueNegativo = estoquePrevisto.find(ins => ins.estoqueAtual < 0);
+    const insumosAfetados = new Set([original.insumoId, updatedMov.insumoId]);
+    const estoqueNegativo = estoquePrevisto.find(ins =>
+      insumosAfetados.has(ins.id) && ins.estoqueAtual < 0
+    );
     if (estoqueNegativo) {
       return { success: false, error: `A alteracao deixaria o estoque de ${estoqueNegativo.nome} negativo.` };
     }
@@ -790,7 +793,9 @@ useEffect(() => {
       return { ...ins, estoqueAtual: ins.estoqueAtual + getMovimentoEstoqueDelta(original, true) };
     });
 
-    const estoqueNegativo = estoquePrevisto.find(ins => ins.estoqueAtual < 0);
+    const estoqueNegativo = estoquePrevisto.find(ins =>
+      ins.id === original.insumoId && ins.estoqueAtual < 0
+    );
     if (estoqueNegativo) {
       return { success: false, error: `A exclusao deixaria o estoque de ${estoqueNegativo.nome} negativo.` };
     }
