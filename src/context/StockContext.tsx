@@ -258,6 +258,18 @@ const hasPatchChanges = (patch: StatePatch) => Object.keys(patch).length > 0;
 const REMOTE_REVISION_STORAGE_KEY = 'chef_remote_revision';
 const REMOTE_FINGERPRINT_STORAGE_KEY = 'chef_remote_fingerprint';
 const SYNC_DEBOUNCE_MS = 250;
+const REMOTE_META_TIMEOUT_MS = 10000;
+const REMOTE_STATE_TIMEOUT_MS = 20000;
+
+const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit, timeoutMs: number) => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
 
 const getSnapshotFingerprint = (snapshot: AppStateSnapshot) => {
   const serialized = JSON.stringify(snapshot);
@@ -268,6 +280,34 @@ const getSnapshotFingerprint = (snapshot: AppStateSnapshot) => {
   }
   return (hash >>> 0).toString(16);
 };
+
+const applyCollectionPatch = <T,>(remoteItems: T[], patch?: CollectionPatch) => {
+  if (!patch) return remoteItems;
+  const deleted = new Set(patch.deleted);
+  const upsertsByKey = new Map(patch.upserts.map(item => [entityKey(item), item]));
+  const remoteKeys = new Set(remoteItems.map(entityKey));
+  const merged = remoteItems
+    .filter(item => !deleted.has(entityKey(item)))
+    .map(item => upsertsByKey.get(entityKey(item)) || item);
+
+  patch.upserts.forEach(item => {
+    const key = entityKey(item);
+    if (key && !remoteKeys.has(key)) merged.push(item);
+  });
+  return merged;
+};
+
+const applyStatePatchToSnapshot = (remote: AppStateSnapshot, patch: StatePatch): AppStateSnapshot => ({
+  currentUnit: patch.currentUnit || remote.currentUnit,
+  user: patch.user || remote.user,
+  users: applyCollectionPatch(remote.users, patch.users),
+  allInsumos: dedupeInsumosById(applyCollectionPatch(remote.allInsumos, patch.allInsumos)),
+  allFichas: applyCollectionPatch(remote.allFichas, patch.allFichas),
+  allMovimentacoes: applyCollectionPatch(remote.allMovimentacoes, patch.allMovimentacoes),
+  allVendas: applyCollectionPatch(remote.allVendas, patch.allVendas),
+  allUtensilios: applyCollectionPatch(remote.allUtensilios, patch.allUtensilios),
+  allMovimentacoesUtensilios: applyCollectionPatch(remote.allMovimentacoesUtensilios, patch.allMovimentacoesUtensilios),
+});
 
 const snapshotFromRemote = (state: any): AppStateSnapshot => ({
   currentUnit: state.currentUnit,
@@ -423,8 +463,11 @@ useEffect(() => {
     let active = true;
 
     const loadRemoteState = async () => {
+      // A slow remote read must not leave the app unusable. The local snapshot
+      // remains visible while the remote state is loaded in the background.
+      setRemoteLoadStatus('ready');
       try {
-        const metaResponse = await fetch('/api/state?meta=1', { headers: { 'cache-control': 'no-cache' } });
+        const metaResponse = await fetchWithTimeout('/api/state?meta=1', { headers: { 'cache-control': 'no-cache' } }, REMOTE_META_TIMEOUT_MS);
         if (!metaResponse.ok) throw new Error('Remote state unavailable');
         const meta = await metaResponse.json() as { _revision?: string };
         const localRevision = localStorage.getItem(REMOTE_REVISION_STORAGE_KEY);
@@ -451,28 +494,30 @@ useEffect(() => {
           }
         }
 
-        const response = await fetch('/api/state', { headers: { 'cache-control': 'no-cache' } });
+        const response = await fetchWithTimeout('/api/state', { headers: { 'cache-control': 'no-cache' } }, REMOTE_STATE_TIMEOUT_MS);
         if (!response.ok) throw new Error('Remote state unavailable');
         const data = await response.json() as Partial<AppStateSnapshot> & { _revision?: string };
         if (!active) return;
         const remoteSnapshot = snapshotFromRemote(data);
+        const localSnapshot = latestSnapshotRef.current || buildSnapshot();
+        const localPatch = buildStatePatch(localSnapshotBeforeRemoteRef.current, localSnapshot);
+        const mergedSnapshot = applyStatePatchToSnapshot(remoteSnapshot, localPatch);
         remoteBaseStateRef.current = remoteSnapshot;
-        latestSnapshotRef.current = remoteSnapshot;
+        latestSnapshotRef.current = mergedSnapshot;
         remoteRevisionRef.current = data._revision || null;
         if (data._revision) localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, data._revision);
-        localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(remoteSnapshot));
+        localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(mergedSnapshot));
         const hasActiveSession = sessionStorage.getItem('chef_is_logged_in') === 'true';
-        if (!hasActiveSession && data.currentUnit) setCurrentUnitState(data.currentUnit);
-        if (!hasActiveSession && data.user) setUser(data.user);
-        if (Array.isArray(data.users)) setUsers(data.users);
-        if (Array.isArray(data.allInsumos)) setAllInsumos(dedupeInsumosById(data.allInsumos));
-        if (Array.isArray(data.allFichas)) setAllFichas(dedupeAutomaticPicoleFichas(data.allFichas));
-        if (Array.isArray(data.allMovimentacoes)) setAllMovimentacoes(data.allMovimentacoes);
-        if (Array.isArray(data.allVendas)) setAllVendas(data.allVendas);
-        if (Array.isArray(data.allUtensilios)) setAllUtensilios(data.allUtensilios);
-        if (Array.isArray(data.allMovimentacoesUtensilios)) setAllMovimentacoesUtensilios(data.allMovimentacoesUtensilios);
+        if (!hasActiveSession) setCurrentUnitState(mergedSnapshot.currentUnit);
+        if (!hasActiveSession) setUser(mergedSnapshot.user);
+        setUsers(mergedSnapshot.users);
+        setAllInsumos(mergedSnapshot.allInsumos);
+        setAllFichas(dedupeAutomaticPicoleFichas(mergedSnapshot.allFichas));
+        setAllMovimentacoes(mergedSnapshot.allMovimentacoes);
+        setAllVendas(mergedSnapshot.allVendas);
+        setAllUtensilios(mergedSnapshot.allUtensilios);
+        setAllMovimentacoesUtensilios(mergedSnapshot.allMovimentacoesUtensilios);
         remoteStateReadyRef.current = true;
-        setRemoteLoadStatus('ready');
       } catch {
         if (active) setRemoteLoadStatus('error');
         // Keep local data for offline use. It must not overwrite the remote state.
@@ -1407,7 +1452,10 @@ useEffect(() => {
       registerUser,
       deleteUser
     }}>
-      {remoteLoadStatus === 'ready' ? <>
+      {remoteLoadStatus !== 'loading' ? <>
+        {remoteLoadStatus === 'error' && <div role="alert" className="fixed bottom-4 left-4 z-[100] max-w-sm rounded-xl bg-amber-50 p-4 text-sm text-amber-900 shadow-lg">
+          Não foi possível atualizar os dados agora. O app está aberto com os dados salvos neste dispositivo. <button type="button" className="font-bold underline" onClick={() => { setRemoteLoadStatus('loading'); setLoadAttempt(value => value + 1); }}>Tentar novamente</button>
+        </div>}
         {syncStatus !== 'saved' && <div role="status" className="fixed bottom-4 right-4 z-[100] max-w-sm rounded-xl bg-amber-50 p-4 text-sm text-amber-900 shadow-lg">
           {syncStatus === 'pending' ? 'Salvando alterações… Aguarde antes de fechar.' : <>Não foi possível salvar. Mantenha esta página aberta. <button type="button" className="font-bold underline" onClick={() => setSyncAttempt(value => value + 1)}>Tentar novamente</button></>}
         </div>}
