@@ -128,7 +128,7 @@ export const Vendas: React.FC = () => {
   });
 
   const [selectedFichaId, setSelectedFichaId] = useState<string | null>(null);
-  const [quantidadeVenda, setQuantidadeVenda] = useState('1');
+  const [quantidadeVenda, setQuantidadeVenda] = useState('0');
   const [dataLancamento, setDataLancamento] = useState(getTodayDateInputValue);
   const [editingVendaId, setEditingVendaId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -322,7 +322,7 @@ export const Vendas: React.FC = () => {
                     onClick={() => {
                       setEditingVendaId(null);
                       setSelectedFichaId(ficha.id);
-                      setQuantidadeVenda('1');
+                      setQuantidadeVenda('0');
                       setDataLancamento(getTodayDateInputValue());
                       setErrorMsg('');
                     }}
