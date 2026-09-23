@@ -171,6 +171,14 @@ const readJsonStorage = <T,>(key: string, fallback: T): T => {
   }
 };
 
+const safeSetStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // O estado remoto continua sendo a fonte principal quando o cache excede a cota.
+  }
+};
+
 const dedupeInsumosById = (items: Insumo[]) => {
   const seen = new Set<string>();
   return items.filter(ins => {
@@ -349,7 +357,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   useEffect(() => {
-    localStorage.setItem('chef_registered_users', JSON.stringify(users));
+    safeSetStorage('chef_registered_users', JSON.stringify(users));
   }, [users]);
 
   const registerUser = (newUser: UserProfile & { senha?: string }) => {
@@ -409,7 +417,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Persist master states
   useEffect(() => {
-    localStorage.setItem('chef_current_unit', currentUnit);
+    safeSetStorage('chef_current_unit', currentUnit);
   }, [currentUnit]);
 
   useEffect(() => {
@@ -419,31 +427,31 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [user.cargo, user.estabelecimento, currentUnit]);
 
   useEffect(() => {
-    localStorage.setItem('chef_user', JSON.stringify(user));
+    safeSetStorage('chef_user', JSON.stringify(user));
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('chef_all_insumos', JSON.stringify(dedupeInsumosById(allInsumos)));
+    safeSetStorage('chef_all_insumos', JSON.stringify(dedupeInsumosById(allInsumos)));
   }, [allInsumos]);
 
   useEffect(() => {
-    localStorage.setItem('chef_all_fichas', JSON.stringify(allFichas));
+    safeSetStorage('chef_all_fichas', JSON.stringify(allFichas));
   }, [allFichas]);
 
   useEffect(() => {
-    localStorage.setItem('chef_all_movimentacoes', JSON.stringify(allMovimentacoes));
+    safeSetStorage('chef_all_movimentacoes', JSON.stringify(allMovimentacoes));
   }, [allMovimentacoes]);
 
   useEffect(() => {
-    localStorage.setItem('chef_all_vendas', JSON.stringify(allVendas));
+    safeSetStorage('chef_all_vendas', JSON.stringify(allVendas));
   }, [allVendas]);
 
   useEffect(() => {
-    localStorage.setItem('chef_all_utensilios', JSON.stringify(allUtensilios));
+    safeSetStorage('chef_all_utensilios', JSON.stringify(allUtensilios));
   }, [allUtensilios]);
 
   useEffect(() => {
-    localStorage.setItem('chef_all_movimentacoes_utensilios', JSON.stringify(allMovimentacoesUtensilios));
+    safeSetStorage('chef_all_movimentacoes_utensilios', JSON.stringify(allMovimentacoesUtensilios));
   }, [allMovimentacoesUtensilios]);
 
 
@@ -505,8 +513,8 @@ useEffect(() => {
         remoteBaseStateRef.current = remoteSnapshot;
         latestSnapshotRef.current = mergedSnapshot;
         remoteRevisionRef.current = data._revision || null;
-        if (data._revision) localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, data._revision);
-        localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(mergedSnapshot));
+        if (data._revision) safeSetStorage(REMOTE_REVISION_STORAGE_KEY, data._revision);
+        safeSetStorage(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(mergedSnapshot));
         const hasActiveSession = sessionStorage.getItem('chef_is_logged_in') === 'true';
         if (!hasActiveSession) setCurrentUnitState(mergedSnapshot.currentUnit);
         if (!hasActiveSession) setUser(mergedSnapshot.user);
@@ -578,7 +586,7 @@ useEffect(() => {
         // Keep the baseline local: remote-only records are not local deletions.
         const syncedSnapshot = snapshot;
         remoteBaseStateRef.current = syncedSnapshot;
-        if (savedRevision) localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, savedRevision);
+        if (savedRevision) safeSetStorage(REMOTE_REVISION_STORAGE_KEY, savedRevision);
         // Reload must read the complete server state, including other sessions.
         localStorage.removeItem(REMOTE_FINGERPRINT_STORAGE_KEY);
         saved = true;
@@ -1343,8 +1351,8 @@ useEffect(() => {
       const result = await response.json() as { _revision?: string };
       const savedRevision = result._revision || revision;
       remoteRevisionRef.current = savedRevision;
-      localStorage.setItem(REMOTE_REVISION_STORAGE_KEY, savedRevision);
-      localStorage.setItem(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(snapshot));
+      safeSetStorage(REMOTE_REVISION_STORAGE_KEY, savedRevision);
+      safeSetStorage(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(snapshot));
       remoteBaseStateRef.current = snapshot;
       latestSnapshotRef.current = snapshot;
       remoteStateReadyRef.current = true;
