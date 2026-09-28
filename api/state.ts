@@ -160,6 +160,31 @@ const normalizeState = (state: any) => {
 };
 
 const collectionKeys = ['users', 'allInsumos', 'allFichas', 'allMovimentacoes', 'allVendas', 'allUtensilios', 'allMovimentacoesUtensilios'] as const;
+const supportedUnits = ['AeB Villa Mayor', 'VM Cumbuco'] as const;
+
+const isSupportedUnit = (value: string | null): value is typeof supportedUnits[number] => (
+  value !== null && supportedUnits.includes(value as typeof supportedUnits[number])
+);
+
+const filterStateByUnit = (state: any, unit: typeof supportedUnits[number]) => {
+  const filterCollection = (items: unknown) => Array.isArray(items)
+    ? items.filter(item => item && typeof item === 'object' && item.unidade === unit)
+    : [];
+
+  return {
+    ...state,
+    currentUnit: unit,
+    users: Array.isArray(state.users)
+      ? state.users.filter((user: any) => user?.estabelecimento === unit)
+      : [],
+    allInsumos: filterCollection(state.allInsumos),
+    allFichas: filterCollection(state.allFichas),
+    allMovimentacoes: filterCollection(state.allMovimentacoes),
+    allVendas: filterCollection(state.allVendas),
+    allUtensilios: filterCollection(state.allUtensilios),
+    allMovimentacoesUtensilios: filterCollection(state.allMovimentacoesUtensilios),
+  };
+};
 
 const isPlainObject = (value: unknown): value is Record<string, any> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -254,16 +279,24 @@ export default async function handler(req: any, res: any) {
       const rows = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
       if (rows.length > 0) {
         const normalized = normalizeState(rows[0].data);
+        const requestedUnit = requestUrl.searchParams.get('unidade');
+        const responseState = isSupportedUnit(requestedUnit)
+          ? filterStateByUnit(normalized, requestedUnit)
+          : normalized;
         // Reads must not overwrite concurrent sales with an older snapshot.
         const revision = rows[0].revision;
-        return res.status(200).json({ ...normalized, _revision: String(revision) });
+        return res.status(200).json({ ...responseState, _revision: String(revision) });
       }
 
       await sql`
         INSERT INTO app_state (id, data)
         VALUES (${APP_STATE_ID}, ${JSON.stringify(initialState)}::jsonb)
       `;
-      return res.status(200).json({ ...initialState, _revision: '0' });
+      const requestedUnit = requestUrl.searchParams.get('unidade');
+      const responseState = isSupportedUnit(requestedUnit)
+        ? filterStateByUnit(initialState, requestedUnit)
+        : initialState;
+      return res.status(200).json({ ...responseState, _revision: '0' });
     }
 
     if (req.method === 'PATCH') {

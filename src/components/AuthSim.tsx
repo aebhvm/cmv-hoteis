@@ -195,7 +195,6 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
                       className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-brand-navy focus:border-brand-navy transition-all appearance-none cursor-pointer"
                     >
                       <option value="AeB Villa Mayor">🏨 AeB Villa Mayor</option>
-                      <option value="VM Cumbuco">🏖️ VM Cumbuco</option>
                     </select>
                   </div>
                 </div>

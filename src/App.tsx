@@ -214,7 +214,6 @@ function AppContent() {
               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 cursor-pointer appearance-none pr-8 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-70"
             >
               <option value="AeB Villa Mayor">🏨 AeB Villa Mayor</option>
-              <option value="VM Cumbuco">🏖️ VM Cumbuco</option>
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
               <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -222,6 +221,7 @@ function AppContent() {
               </svg>
             </div>
           </div>
+          <p className="mt-2 text-[10px] font-semibold text-amber-700">VM Cumbuco temporariamente pausado para reduzir o carregamento.</p>
         </div>
 
         {/* Informações da Sessão do Usuário */}

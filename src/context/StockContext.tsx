@@ -74,6 +74,7 @@ export const useStock = () => {
 
 
 type Unidade = 'AeB Villa Mayor' | 'VM Cumbuco';
+const UNIDADE_ATIVA: Unidade = 'AeB Villa Mayor';
 
 const SETOR_CAFE: SetorEstoque = 'Café da manhã';
 const SETOR_RESTAURANTE: SetorEstoque = 'Restaurante';
@@ -343,8 +344,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const picoleGenerationPendingRef = useRef(false);
   const [currentUnit, setCurrentUnitState] = useState<Unidade>(() => {
-    const saved = localStorage.getItem('chef_current_unit');
-    return (saved as Unidade) || 'AeB Villa Mayor';
+    return UNIDADE_ATIVA;
   });
 
   const [user, setUser] = useState<UserProfile>(() => {
@@ -422,7 +422,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     if (user.cargo !== 'Colaborador') return;
-    const assignedUnit: Unidade = user.estabelecimento === 'VM Cumbuco' ? 'VM Cumbuco' : 'AeB Villa Mayor';
+    const assignedUnit: Unidade = UNIDADE_ATIVA;
     if (currentUnit !== assignedUnit) setCurrentUnitState(assignedUnit);
   }, [user.cargo, user.estabelecimento, currentUnit]);
 
@@ -502,7 +502,7 @@ useEffect(() => {
           }
         }
 
-        const response = await fetchWithTimeout('/api/state', { headers: { 'cache-control': 'no-cache' } }, REMOTE_STATE_TIMEOUT_MS);
+        const response = await fetchWithTimeout(`/api/state?unidade=${encodeURIComponent(UNIDADE_ATIVA)}`, { headers: { 'cache-control': 'no-cache' } }, REMOTE_STATE_TIMEOUT_MS);
         if (!response.ok) throw new Error('Remote state unavailable');
         const data = await response.json() as Partial<AppStateSnapshot> & { _revision?: string };
         if (!active) return;
@@ -630,7 +630,7 @@ useEffect(() => {
   const movimentacoesUtensilios = allMovimentacoesUtensilios.filter(m => m.unidade === currentUnit);
 
   const setCurrentUnit = (unit: 'AeB Villa Mayor' | 'VM Cumbuco') => {
-    setCurrentUnitState(unit);
+    if (unit === UNIDADE_ATIVA) setCurrentUnitState(unit);
   };
 
   const updateUser = (profile: Partial<UserProfile>) => {
