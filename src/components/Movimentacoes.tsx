@@ -63,6 +63,8 @@ const toMovementIso = (dateKey: string, previousDate?: string) => {
 const SETOR_CAFE: SetorEstoque = 'Café da manhã';
 const SETOR_RESTAURANTE: SetorEstoque = 'Restaurante';
 const SETOR_TABS = ['Todos', SETOR_CAFE, SETOR_RESTAURANTE] as const;
+const INITIAL_VISIBLE_MOVEMENTS = 120;
+const VISIBLE_MOVEMENTS_STEP = 120;
 
 const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
   if (insumo.setor === SETOR_CAFE || insumo.setor === SETOR_RESTAURANTE) return insumo.setor;
@@ -126,6 +128,7 @@ export const Movimentacoes: React.FC = () => {
   const [custoUnitario, setCustoUnitario] = useState('');
   const [observacao, setObservacao] = useState('');
   const [dataMovimentacao, setDataMovimentacao] = useState(() => toLocalDateKey(new Date()));
+  const [visibleMovementsLimit, setVisibleMovementsLimit] = useState(INITIAL_VISIBLE_MOVEMENTS);
 
   // Feedbacks
   const [errorMsg, setErrorMsg] = useState('');
@@ -149,6 +152,10 @@ export const Movimentacoes: React.FC = () => {
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [editingMovId, showForm]);
+
+  useEffect(() => {
+    setVisibleMovementsLimit(INITIAL_VISIBLE_MOVEMENTS);
+  }, [searchTerm, selectedDate, selectedType, setorAtivo, movimentacoes.length]);
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const normalizedSearchTerm = useMemo(() => normalizeSearch(deferredSearchTerm.trim()), [deferredSearchTerm]);
   const insumosById = useMemo(() => new Map(insumos.map(insumo => [insumo.id, insumo])), [insumos]);
@@ -361,13 +368,15 @@ export const Movimentacoes: React.FC = () => {
   }).sort((a, b) => (parseMovementDate(b.data)?.getTime() || 0) - (parseMovementDate(a.data)?.getTime() || 0)),
   [insumosById, movimentacoes, normalizedSearchTerm, selectedDate, selectedType, setorAtivo]);
 
-  const groupedMovs = useMemo(() => filteredMovs.reduce<Array<{ dateKey: string; items: typeof filteredMovs }>>((groups, mov) => {
+  const visibleMovs = useMemo(() => filteredMovs.slice(0, visibleMovementsLimit), [filteredMovs, visibleMovementsLimit]);
+
+  const groupedMovs = useMemo(() => visibleMovs.reduce<Array<{ dateKey: string; items: typeof filteredMovs }>>((groups, mov) => {
     const dateKey = toLocalDateKey(mov.data);
     const lastGroup = groups[groups.length - 1];
     if (lastGroup?.dateKey === dateKey) lastGroup.items.push(mov);
     else groups.push({ dateKey, items: [mov] });
     return groups;
-  }, []), [filteredMovs]);
+  }, []), [visibleMovs]);
 
   const { totalEntradasR$, totalDesperdicioR$, totalSelecionadoR$ } = useMemo(() => {
     let totalEntradasR$ = 0;
@@ -891,6 +900,22 @@ export const Movimentacoes: React.FC = () => {
             </tbody>
           </table>
         </div>
+        {filteredMovs.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/50 px-4 py-3 text-[11px] text-slate-500">
+            <span>
+              Exibindo {Math.min(visibleMovs.length, filteredMovs.length)} de {filteredMovs.length} movimentações filtradas.
+            </span>
+            {visibleMovs.length < filteredMovs.length && (
+              <button
+                type="button"
+                onClick={() => setVisibleMovementsLimit(current => current + VISIBLE_MOVEMENTS_STEP)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-semibold text-brand-navy shadow-sm transition-colors hover:bg-slate-50"
+              >
+                Carregar mais movimentações
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

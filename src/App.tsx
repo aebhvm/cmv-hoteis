@@ -32,6 +32,45 @@ import {
   Sun
 } from 'lucide-react';
 
+class AppViewErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  private readonly children: React.ReactNode;
+
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.children = props.children;
+  }
+
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('Falha ao renderizar a tela atual:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="mx-auto flex min-h-48 max-w-xl flex-col items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
+          <h2 className="text-sm font-bold text-rose-800">Não foi possível manter esta tela aberta</h2>
+          <p className="mt-2 text-xs text-rose-700">Os dados locais foram preservados. Recarregue somente a tela para tentar novamente.</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-lg bg-brand-navy px-4 py-2 text-xs font-bold text-white"
+          >
+            Recarregar tela
+          </button>
+        </div>
+      );
+    }
+
+    return this.children;
+  }
+}
+
 function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem('chef_is_logged_in') === 'true');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -307,7 +346,7 @@ function AppContent() {
         {/* Corpo da Visão Ativa */}
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6" id="view-container">
           <Suspense fallback={<div className="flex min-h-32 items-center justify-center text-sm text-slate-500">Carregando...</div>}>
-            {renderActiveView()}
+            <AppViewErrorBoundary>{renderActiveView()}</AppViewErrorBoundary>
           </Suspense>
         </div>
       </main>
