@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { FichaTecnica, Insumo } from '../types';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
+import { formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
 import {
   AlertTriangle,
   CalendarDays,
@@ -198,7 +199,7 @@ export const Vendas: React.FC = () => {
     event.preventDefault();
     if (!selectedFichaId || !quantidadeVenda || !dataLancamento) return;
 
-    const qty = Number(quantidadeVenda);
+    const qty = parsePtBrNumber(quantidadeVenda);
     const ficha = fichas.find(item => item.id === selectedFichaId);
     if (!ficha) return;
 
@@ -479,13 +480,15 @@ export const Vendas: React.FC = () => {
                 </label>
                 <input
                   id="quantidade-venda"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   min="1"
                   step="1"
                   autoFocus
                   required
                   value={quantidadeVenda}
                   onChange={(event) => setQuantidadeVenda(event.target.value)}
+                  onBlur={(event) => setQuantidadeVenda(formatPtBrNumberInput(event.target.value, 0))}
                   className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                   placeholder="Qtd"
                 />
@@ -494,7 +497,7 @@ export const Vendas: React.FC = () => {
               <div className="p-3 bg-slate-50 rounded-lg flex justify-between items-center text-xs border border-slate-100">
                 <span className="text-slate-500 font-semibold">Valor Total do Pedido:</span>
                 <strong className="text-sm font-bold text-slate-800 font-mono">
-                  R$ {formatMoney((Number(quantidadeVenda || 1)) * selectedFicha.precoVenda)}
+                  R$ {formatMoney((parsePtBrNumber(quantidadeVenda || '1')) * selectedFicha.precoVenda)}
                 </strong>
               </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { Insumo, SetorEstoque } from '../types';
+import { formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
 import { 
   ClipboardCheck, 
   Search, 
@@ -64,7 +65,7 @@ export const Inventario: React.FC = () => {
     
     if (!ins || contagemStr === undefined || contagemStr === '') return;
 
-    const contagemVal = Number(contagemStr);
+    const contagemVal = parsePtBrNumber(contagemStr);
     const discrepancia = contagemVal - ins.estoqueAtual;
 
     if (discrepancia === 0) {
@@ -243,7 +244,7 @@ export const Inventario: React.FC = () => {
                 const contagemFisicaDig = contagensFisicas[ins.id] || '';
                 const temDigitacao = contagemFisicaDig !== '';
                 
-                const valFisico = temDigitacao ? Number(contagemFisicaDig) : ins.estoqueAtual;
+                const valFisico = temDigitacao ? parsePtBrNumber(contagemFisicaDig) : ins.estoqueAtual;
                 const discrepancia = valFisico - ins.estoqueAtual;
                 const impactoFinanceiro = discrepancia * ins.custoMedio;
 
@@ -266,12 +267,14 @@ export const Inventario: React.FC = () => {
                       <div className="flex justify-end">
                         <div className="relative w-28">
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             step="any"
                             placeholder={isColaborador ? "Restrito" : "Contagem"}
                             disabled={isColaborador}
                             value={contagemFisicaDig}
                             onChange={(e) => handleContagemChange(ins.id, e.target.value)}
+                            onBlur={(e) => handleContagemChange(ins.id, formatPtBrNumberInput(e.target.value))}
                             className={`w-full text-right pr-9 pl-3 py-1 bg-white border rounded-lg text-slate-850 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 ${
                               isColaborador 
                                 ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'

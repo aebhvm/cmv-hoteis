@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Utensilio } from '../types';
+import { formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
 import writeExcelFile from 'write-excel-file/browser';
 
 const categories = ['Copos', 'Talheres', 'Pratos', 'Travessas', 'Outros'];
@@ -161,8 +162,8 @@ export const Utensilios: React.FC = () => {
   const submitCadastro = (event: React.FormEvent) => {
     event.preventDefault();
     const nome = form.nome.trim();
-    const quantidadeAtual = Number(form.quantidadeAtual);
-    const estoqueMinimo = Number(form.estoqueMinimo);
+    const quantidadeAtual = parsePtBrNumber(form.quantidadeAtual);
+    const estoqueMinimo = parsePtBrNumber(form.estoqueMinimo);
     if (!nome || !Number.isFinite(quantidadeAtual) || quantidadeAtual < 0 || !Number.isFinite(estoqueMinimo) || estoqueMinimo < 0) {
       notify('Preencha nome e quantidades válidas.');
       return;
@@ -185,7 +186,7 @@ export const Utensilios: React.FC = () => {
       nome: editando.nome.trim(),
       categoria: editando.categoria,
       unidadeMedida: editando.unidadeMedida,
-      estoqueMinimo: Math.max(0, Number(editando.estoqueMinimo))
+      estoqueMinimo: Math.max(0, parsePtBrNumber(String(editando.estoqueMinimo)))
     });
     setEditando(null);
     notify('Utensílio atualizado.');
@@ -193,7 +194,7 @@ export const Utensilios: React.FC = () => {
 
   const submitContagem = (event: React.FormEvent) => {
     event.preventDefault();
-    const result = registrarContagemUtensilio(contagemId, Number(contagem), contagemObservacao.trim());
+    const result = registrarContagemUtensilio(contagemId, parsePtBrNumber(contagem), contagemObservacao.trim());
     if (!result.success) {
       notify(result.error || 'Não foi possível salvar a contagem.');
       return;
@@ -212,7 +213,7 @@ export const Utensilios: React.FC = () => {
   const submitAdicao = (event: React.FormEvent) => {
     event.preventDefault();
     if (!adicionarItem) return;
-    const result = registrarEntradaUtensilio(adicionarItem.id, Number(adicionarQuantidade), adicionarObservacao.trim());
+    const result = registrarEntradaUtensilio(adicionarItem.id, parsePtBrNumber(adicionarQuantidade), adicionarObservacao.trim());
     if (!result.success) {
       notify(result.error || 'Nao foi possivel adicionar o estoque.');
       return;
@@ -223,7 +224,7 @@ export const Utensilios: React.FC = () => {
 
   const submitPerda = (event: React.FormEvent) => {
     event.preventDefault();
-    const result = registrarPerdaUtensilio(perdaId, Number(perda), perdaObservacao.trim());
+    const result = registrarPerdaUtensilio(perdaId, parsePtBrNumber(perda), perdaObservacao.trim());
     if (!result.success) {
       notify(result.error || 'Não foi possível registrar a perda.');
       return;
@@ -304,10 +305,10 @@ export const Utensilios: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-xs font-semibold text-slate-600">Quantidade inicial
-                  <input required min="0" step="any" type="number" value={form.quantidadeAtual} onChange={e => setForm({ ...form, quantidadeAtual: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+                  <input required min="0" step="any" type="text" inputMode="decimal" value={form.quantidadeAtual} onChange={e => setForm({ ...form, quantidadeAtual: e.target.value })} onBlur={e => setForm({ ...form, quantidadeAtual: formatPtBrNumberInput(e.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">Estoque mínimo
-                  <input required min="0" step="any" type="number" value={form.estoqueMinimo} onChange={e => setForm({ ...form, estoqueMinimo: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+                  <input required min="0" step="any" type="text" inputMode="decimal" value={form.estoqueMinimo} onChange={e => setForm({ ...form, estoqueMinimo: e.target.value })} onBlur={e => setForm({ ...form, estoqueMinimo: formatPtBrNumberInput(e.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
                 </label>
               </div>
               <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-navy px-3 py-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-navy/90">
@@ -328,7 +329,7 @@ export const Utensilios: React.FC = () => {
                 <option value="">Selecione o utensílio</option>
                 {utensilios.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
-              <input required min="0" step="any" type="number" value={contagem} onChange={e => setContagem(e.target.value)} placeholder="Quantidade encontrada" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+              <input required min="0" step="any" type="text" inputMode="decimal" value={contagem} onChange={e => setContagem(e.target.value)} onBlur={e => setContagem(formatPtBrNumberInput(e.target.value))} placeholder="Quantidade encontrada" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <input value={contagemObservacao} onChange={e => setContagemObservacao(e.target.value)} placeholder="Observação (opcional)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <button type="submit" disabled={!utensilios.length} className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">Salvar contagem</button>
             </div>
@@ -344,7 +345,7 @@ export const Utensilios: React.FC = () => {
                 <option value="">Selecione o utensílio</option>
                 {utensilios.map(item => <option key={item.id} value={item.id}>{item.nome} ({formatNumber(item.quantidadeAtual)} disponíveis)</option>)}
               </select>
-              <input required min="0.01" step="any" type="number" value={perda} onChange={e => setPerda(e.target.value)} placeholder="Quantidade perdida" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+              <input required min="0.01" step="any" type="text" inputMode="decimal" value={perda} onChange={e => setPerda(e.target.value)} onBlur={e => setPerda(formatPtBrNumberInput(e.target.value))} placeholder="Quantidade perdida" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <input value={perdaObservacao} onChange={e => setPerdaObservacao(e.target.value)} placeholder="Motivo (opcional)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <button type="submit" disabled={!utensilios.length} className="w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50">Salvar perda</button>
             </div>
@@ -446,7 +447,7 @@ export const Utensilios: React.FC = () => {
             </div>
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-slate-600">Quantidade comprada
-                <input required min="0.01" step="any" type="number" value={adicionarQuantidade} onChange={e => setAdicionarQuantidade(e.target.value)} placeholder="Ex.: 10" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+                <input required min="0.01" step="any" type="text" inputMode="decimal" value={adicionarQuantidade} onChange={e => setAdicionarQuantidade(e.target.value)} onBlur={e => setAdicionarQuantidade(formatPtBrNumberInput(e.target.value))} placeholder="Ex.: 10" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               </label>
               <label className="block text-xs font-semibold text-slate-600">Observacao (opcional)
                 <input value={adicionarObservacao} onChange={e => setAdicionarObservacao(e.target.value)} placeholder="Ex.: Compra NF 123" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />

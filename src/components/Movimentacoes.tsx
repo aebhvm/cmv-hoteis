@@ -1,6 +1,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
+import { formatPtBrCurrencyInput, formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
 import { Insumo, Movimentacao, SetorEstoque } from '../types';
 import { 
   Plus, 
@@ -241,7 +242,7 @@ export const Movimentacoes: React.FC = () => {
 
 
     // Validar se quantidade é suficiente para saídas/desperdícios
-    const qty = Number(quantidade);
+    const qty = parsePtBrNumber(quantidade);
     if (tipo === 'ajuste' && qty < 0) {
       setErrorMsg('O estoque físico final não pode ser negativo.');
       return;
@@ -258,7 +259,7 @@ export const Movimentacoes: React.FC = () => {
       insumoId,
       tipo,
       quantidade: qty,
-      custoUnitario: custoUnitario ? Number(custoUnitario) : undefined,
+      custoUnitario: custoUnitario ? parsePtBrNumber(custoUnitario) : undefined,
       observacao: observacao || undefined,
       data: toMovementIso(dataMovimentacao, originalMov?.data),
       estoqueFisico: tipo === 'ajuste' ? qty : undefined
@@ -735,10 +736,12 @@ export const Movimentacoes: React.FC = () => {
                 </label>
                 <div className="relative">
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     step="any"
                     value={quantidade}
                     onChange={(e) => setQuantidade(e.target.value)}
+                    onBlur={(e) => setQuantidade(formatPtBrNumberInput(e.target.value))}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                     placeholder="ex: 2.5"
                     min={tipo === 'ajuste' ? 0 : undefined}
@@ -762,10 +765,12 @@ export const Movimentacoes: React.FC = () => {
                   {tipo === 'entrada' ? 'Custo Unitário (R$) *' : 'Custo Unit. (Opcional)'}
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   step="any"
                   value={custoUnitario}
                   onChange={(e) => setCustoUnitario(e.target.value)}
+                  onBlur={(e) => setCustoUnitario(formatPtBrCurrencyInput(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                   placeholder="R$ 0.00"
                   disabled={tipo !== 'entrada' && tipo !== 'ajuste'}

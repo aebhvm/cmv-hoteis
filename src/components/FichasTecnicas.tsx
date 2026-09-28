@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
+import { formatPtBrCurrencyInput, formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
 import { FichaTecnica, IngredienteFicha, Insumo } from '../types';
 import { 
   Plus, 
@@ -110,7 +111,7 @@ export const FichasTecnicas: React.FC = () => {
     const ins = insumos.find(i => i.id === selectedInsumoId);
     if (!ins) return;
 
-    let quantFinal = Number(quantidadeInput);
+    let quantFinal = parsePtBrNumber(quantidadeInput);
     if (unidadeInserida === 'sub' && (ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L')) {
       quantFinal = quantFinal / 1000;
     }
@@ -198,8 +199,8 @@ export const FichasTecnicas: React.FC = () => {
       nome,
       categoria,
       descricao: descricao || undefined,
-      precoVenda: Number(precoVenda),
-      rendimentoPorcoes: Number(rendimentoPorcoes) || 1,
+      precoVenda: parsePtBrNumber(precoVenda),
+      rendimentoPorcoes: parsePtBrNumber(rendimentoPorcoes) || 1,
       ingredientes: ingredientesEscolhidos
     };
 
@@ -391,10 +392,12 @@ export const FichasTecnicas: React.FC = () => {
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Preço de Venda (R$) *</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   step="any"
                   value={precoVenda}
                   onChange={(e) => setPrecoVenda(e.target.value)}
+                  onBlur={(e) => setPrecoVenda(formatPtBrCurrencyInput(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                   placeholder="R$ 0.00"
                   required
@@ -416,9 +419,11 @@ export const FichasTecnicas: React.FC = () => {
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Rendimento (Porções)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={rendimentoPorcoes}
                   onChange={(e) => setRendimentoPorcoes(e.target.value)}
+                  onBlur={(e) => setRendimentoPorcoes(formatPtBrNumberInput(e.target.value, 0))}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                   placeholder="ex: 1"
                 />
@@ -481,11 +486,13 @@ export const FichasTecnicas: React.FC = () => {
                   <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Quantidade Necessária</label>
                   <div className="relative">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       step="any"
                       value={quantidadeInput}
                       onKeyDown={handleAddIngredientePorEnter}
                       onChange={(e) => setQuantidadeInput(e.target.value)}
+                      onBlur={(e) => setQuantidadeInput(formatPtBrNumberInput(e.target.value))}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                       placeholder="Qtd"
                     />

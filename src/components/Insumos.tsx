@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
+import { formatPtBrCurrencyInput, formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
 import { Insumo, SetorEstoque } from '../types';
 import { 
   Plus, 
@@ -135,8 +136,8 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
     e.preventDefault();
     if (isColaborador) return;
 
-    const valorEmb = valorEmbalagem ? Number(valorEmbalagem) : undefined;
-    const conteudoEmb = conteudoEmbalagem ? Number(conteudoEmbalagem) : undefined;
+    const valorEmb = valorEmbalagem ? parsePtBrNumber(valorEmbalagem) : undefined;
+    const conteudoEmb = conteudoEmbalagem ? parsePtBrNumber(conteudoEmbalagem) : undefined;
 
     if (!nome || !valorEmb || !conteudoEmb || conteudoEmb <= 0 || !estoqueMinimo || !estoqueAtual) {
       setErrorMsg('Preencha nome, valor da embalagem, quantidade da embalagem, estoque minimo e estoque atual.');
@@ -153,8 +154,8 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
       valorEmbalagem: valorEmb,
       conteudoEmbalagem: conteudoEmb,
       custoMedio: custoCalculado,
-      estoqueAtual: editingId ? Number(estoqueAtual) : Number(estoqueAtual || 0),
-      estoqueMinimo: Number(estoqueMinimo),
+      estoqueAtual: editingId ? parsePtBrNumber(estoqueAtual) : parsePtBrNumber(estoqueAtual || '0'),
+      estoqueMinimo: parsePtBrNumber(estoqueMinimo),
       fornecedor: fornecedor || undefined,
       validade: validade || undefined
     };
@@ -205,8 +206,8 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
     const ins = insumos.find(i => i.id === quickAddId);
     if (!ins) return;
 
-    const qty = Number(quickQty);
-    const cost = quickCost ? Number(quickCost) : ins.custoMedio;
+    const qty = parsePtBrNumber(quickQty);
+    const cost = quickCost ? parsePtBrNumber(quickCost) : ins.custoMedio;
 
     // Adiciona movimentação de entrada
     addMovimentacao({
@@ -242,8 +243,8 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
 
   const handleValorEmbalagemChange = (value: string) => {
     setValorEmbalagem(value);
-    const valor = Number(value);
-    const conteudo = Number(conteudoEmbalagem);
+    const valor = parsePtBrNumber(value);
+    const conteudo = parsePtBrNumber(conteudoEmbalagem);
     if (value && conteudoEmbalagem && conteudo > 0) {
       setCustoMedio(getPackageUnitCost(valor, conteudo).toFixed(2));
     }
@@ -251,8 +252,8 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
 
   const handleConteudoEmbalagemChange = (value: string) => {
     setConteudoEmbalagem(value);
-    const valor = Number(valorEmbalagem);
-    const conteudo = Number(value);
+    const valor = parsePtBrNumber(valorEmbalagem);
+    const conteudo = parsePtBrNumber(value);
     if (valorEmbalagem && value && conteudo > 0) {
       setCustoMedio(getPackageUnitCost(valor, conteudo).toFixed(2));
     }
@@ -467,10 +468,12 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
               <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Estoque Mínimo (Segurança) *</label>
               <div className="relative">
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   step="any"
                   value={estoqueMinimo}
                   onChange={(e) => setEstoqueMinimo(e.target.value)}
+                  onBlur={(e) => setEstoqueMinimo(formatPtBrNumberInput(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                   placeholder="ex: 5"
                   required
@@ -481,10 +484,12 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
             <div>
               <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Valor da Embalagem (R$) *</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 step="any"
                 value={valorEmbalagem}
                 onChange={(e) => handleValorEmbalagemChange(e.target.value)}
+                onBlur={(e) => setValorEmbalagem(formatPtBrCurrencyInput(e.target.value))}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                 placeholder="ex: 53.76"
               />
@@ -494,10 +499,12 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
               <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Conteudo da Embalagem *</label>
               <div className="relative">
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   step="any"
                   value={conteudoEmbalagem}
                   onChange={(e) => handleConteudoEmbalagemChange(e.target.value)}
+                  onBlur={(e) => setConteudoEmbalagem(formatPtBrNumberInput(e.target.value))}
                   className="w-full px-3 py-2 pr-12 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                   placeholder={unidadeMedida === 'L' ? 'ex: 0.750' : unidadeMedida === 'kg' ? 'ex: 1.000' : 'ex: 1'}
                 />
@@ -510,10 +517,12 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                 {editingId ? 'Estoque Atual' : 'Estoque Inicial'} *
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 step="any"
                 value={estoqueAtual}
                 onChange={(e) => setEstoqueAtual(e.target.value)}
+                onBlur={(e) => setEstoqueAtual(formatPtBrNumberInput(e.target.value))}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                 placeholder="ex: 10"
                 required
@@ -582,11 +591,13 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
               <div className="relative">
                 <input
                   ref={quickQuantityInputRef}
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   step="any"
                   required
                   value={quickQty}
                   onChange={(e) => setQuickQty(e.target.value)}
+                  onBlur={(e) => setQuickQty(formatPtBrNumberInput(e.target.value))}
                   className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                   placeholder="Qtd"
                 />
@@ -599,10 +610,12 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
             <div>
               <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Custo por Unidade (R$)</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 step="any"
                 value={quickCost}
                 onChange={(e) => setQuickCost(e.target.value)}
+                onBlur={(e) => setQuickCost(formatPtBrCurrencyInput(e.target.value))}
                 className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                 placeholder={`Sugestão: R$ ${formatMoney(insumos.find(i => i.id === quickAddId)?.custoMedio || 0)}`}
               />
