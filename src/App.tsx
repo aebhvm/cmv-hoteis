@@ -33,11 +33,10 @@ import {
 } from 'lucide-react';
 
 class AppViewErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  private readonly children: React.ReactNode;
+  declare readonly props: { children: React.ReactNode };
 
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.children = props.children;
   }
 
   state = { hasError: false };
@@ -67,7 +66,7 @@ class AppViewErrorBoundary extends React.Component<{ children: React.ReactNode }
       );
     }
 
-    return this.children;
+    return this.props.children;
   }
 }
 
