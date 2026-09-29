@@ -1,7 +1,12 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
-import { formatPtBrCurrencyInput, formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
+import {
+  formatPtBrCurrencyInput,
+  formatPtBrNumberInput,
+  formatPtBrNumberWhileTyping,
+  parsePtBrNumber,
+} from '../utils/numberInput';
 import { Insumo, Movimentacao, SetorEstoque } from '../types';
 import { 
   Plus, 
@@ -213,7 +218,7 @@ export const Movimentacoes: React.FC = () => {
     setInsumoId(ins.id);
     setInsumoSearchTerm(ins.nome);
     setSetorMovimentacao(getInsumoSetor(ins));
-    setCustoUnitario(ins.custoMedio.toString());
+    setCustoUnitario(formatPtBrCurrencyInput(ins.custoMedio.toString()));
     setSuggestionIndex(-1);
     setShowInsumoSugestoes(false);
   };
@@ -325,8 +330,10 @@ export const Movimentacoes: React.FC = () => {
     setSetorMovimentacao(getMovimentacaoSetor(mov));
     setShowInsumoSugestoes(false);
     setTipo(mov.tipo);
-    setQuantidade(quantidadeEdicao.toString());
-    setCustoUnitario(mov.custoUnitario?.toString() || '');
+    setQuantidade(formatPtBrNumberInput(quantidadeEdicao.toString()));
+    setCustoUnitario(mov.custoUnitario === undefined
+      ? ''
+      : formatPtBrCurrencyInput(mov.custoUnitario.toString()));
     setObservacao(mov.observacao || '');
     setErrorMsg('');
     setDataMovimentacao(toLocalDateKey(mov.data));
@@ -740,10 +747,10 @@ export const Movimentacoes: React.FC = () => {
                     inputMode="decimal"
                     step="any"
                     value={quantidade}
-                    onChange={(e) => setQuantidade(e.target.value)}
+                    onChange={(e) => setQuantidade(formatPtBrNumberWhileTyping(e.target.value))}
                     onBlur={(e) => setQuantidade(formatPtBrNumberInput(e.target.value))}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
-                    placeholder="ex: 2.5"
+                    placeholder="ex: 2,5"
                     min={tipo === 'ajuste' ? 0 : undefined}
                     required
                   />
@@ -769,10 +776,10 @@ export const Movimentacoes: React.FC = () => {
                   inputMode="decimal"
                   step="any"
                   value={custoUnitario}
-                  onChange={(e) => setCustoUnitario(e.target.value)}
+                  onChange={(e) => setCustoUnitario(formatPtBrNumberWhileTyping(e.target.value, 2))}
                   onBlur={(e) => setCustoUnitario(formatPtBrCurrencyInput(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
-                  placeholder="R$ 0.00"
+                  placeholder="R$ 0,00"
                   disabled={tipo !== 'entrada' && tipo !== 'ajuste'}
                   required={tipo === 'entrada'}
                 />

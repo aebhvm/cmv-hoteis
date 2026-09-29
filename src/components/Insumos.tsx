@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
-import { formatPtBrCurrencyInput, formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
+import {
+  formatPtBrCurrencyInput,
+  formatPtBrNumberInput,
+  formatPtBrNumberWhileTyping,
+  parsePtBrNumber,
+} from '../utils/numberInput';
 import { Insumo, SetorEstoque } from '../types';
 import { 
   Plus, 
@@ -112,11 +117,15 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
     setCategoria(categorias.includes(ins.categoria) ? ins.categoria : 'Outros');
     setSetor(ins.setor === SETOR_CAFE || ins.setor === SETOR_RESTAURANTE ? ins.setor : getInsumoSetor(ins));
     setUnidadeMedida(ins.unidadeMedida);
-    setValorEmbalagem(ins.valorEmbalagem?.toString() || '');
-    setConteudoEmbalagem(ins.conteudoEmbalagem?.toString() || '');
+    setValorEmbalagem(ins.valorEmbalagem === undefined
+      ? ''
+      : formatPtBrCurrencyInput(ins.valorEmbalagem.toString()));
+    setConteudoEmbalagem(ins.conteudoEmbalagem === undefined
+      ? ''
+      : formatPtBrNumberInput(ins.conteudoEmbalagem.toString()));
     setCustoMedio(ins.custoMedio.toString());
-    setEstoqueAtual(ins.estoqueAtual.toString());
-    setEstoqueMinimo(ins.estoqueMinimo.toString());
+    setEstoqueAtual(formatPtBrNumberInput(ins.estoqueAtual.toString()));
+    setEstoqueMinimo(formatPtBrNumberInput(ins.estoqueMinimo.toString()));
     setFornecedor(ins.fornecedor || '');
     setValidade(ins.validade || '');
     setErrorMsg('');
@@ -242,19 +251,21 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
   const capitalImobilizadoSetor = insumosDoSetor.reduce((total, ins) => total + (ins.estoqueAtual * getEffectiveUnitCost(ins)), 0);
 
   const handleValorEmbalagemChange = (value: string) => {
-    setValorEmbalagem(value);
-    const valor = parsePtBrNumber(value);
+    const formattedValue = formatPtBrNumberWhileTyping(value, 2);
+    setValorEmbalagem(formattedValue);
+    const valor = parsePtBrNumber(formattedValue);
     const conteudo = parsePtBrNumber(conteudoEmbalagem);
-    if (value && conteudoEmbalagem && conteudo > 0) {
+    if (formattedValue && conteudoEmbalagem && conteudo > 0) {
       setCustoMedio(getPackageUnitCost(valor, conteudo).toFixed(2));
     }
   };
 
   const handleConteudoEmbalagemChange = (value: string) => {
-    setConteudoEmbalagem(value);
+    const formattedValue = formatPtBrNumberWhileTyping(value);
+    setConteudoEmbalagem(formattedValue);
     const valor = parsePtBrNumber(valorEmbalagem);
-    const conteudo = parsePtBrNumber(value);
-    if (valorEmbalagem && value && conteudo > 0) {
+    const conteudo = parsePtBrNumber(formattedValue);
+    if (valorEmbalagem && formattedValue && conteudo > 0) {
       setCustoMedio(getPackageUnitCost(valor, conteudo).toFixed(2));
     }
   };
@@ -472,7 +483,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                   inputMode="decimal"
                   step="any"
                   value={estoqueMinimo}
-                  onChange={(e) => setEstoqueMinimo(e.target.value)}
+                  onChange={(e) => setEstoqueMinimo(formatPtBrNumberWhileTyping(e.target.value))}
                   onBlur={(e) => setEstoqueMinimo(formatPtBrNumberInput(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                   placeholder="ex: 5"
@@ -491,7 +502,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                 onChange={(e) => handleValorEmbalagemChange(e.target.value)}
                 onBlur={(e) => setValorEmbalagem(formatPtBrCurrencyInput(e.target.value))}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
-                placeholder="ex: 53.76"
+                placeholder="ex: 53,76"
               />
             </div>
 
@@ -506,7 +517,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                   onChange={(e) => handleConteudoEmbalagemChange(e.target.value)}
                   onBlur={(e) => setConteudoEmbalagem(formatPtBrNumberInput(e.target.value))}
                   className="w-full px-3 py-2 pr-12 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
-                  placeholder={unidadeMedida === 'L' ? 'ex: 0.750' : unidadeMedida === 'kg' ? 'ex: 1.000' : 'ex: 1'}
+                  placeholder={unidadeMedida === 'L' ? 'ex: 0,750' : unidadeMedida === 'kg' ? 'ex: 1,000' : 'ex: 1'}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 uppercase font-bold">{unidadeMedida}</span>
               </div>
@@ -521,7 +532,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                 inputMode="decimal"
                 step="any"
                 value={estoqueAtual}
-                onChange={(e) => setEstoqueAtual(e.target.value)}
+                onChange={(e) => setEstoqueAtual(formatPtBrNumberWhileTyping(e.target.value))}
                 onBlur={(e) => setEstoqueAtual(formatPtBrNumberInput(e.target.value))}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                 placeholder="ex: 10"
@@ -596,7 +607,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                   step="any"
                   required
                   value={quickQty}
-                  onChange={(e) => setQuickQty(e.target.value)}
+                  onChange={(e) => setQuickQty(formatPtBrNumberWhileTyping(e.target.value))}
                   onBlur={(e) => setQuickQty(formatPtBrNumberInput(e.target.value))}
                   className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                   placeholder="Qtd"
@@ -614,7 +625,7 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
                 inputMode="decimal"
                 step="any"
                 value={quickCost}
-                onChange={(e) => setQuickCost(e.target.value)}
+                onChange={(e) => setQuickCost(formatPtBrNumberWhileTyping(e.target.value, 2))}
                 onBlur={(e) => setQuickCost(formatPtBrCurrencyInput(e.target.value))}
                 className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                 placeholder={`Sugestão: R$ ${formatMoney(insumos.find(i => i.id === quickAddId)?.custoMedio || 0)}`}

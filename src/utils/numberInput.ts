@@ -34,6 +34,49 @@ export const parsePtBrNumber = (value: string | number | undefined | null) => {
   return Number(`${sign}${unsigned}`);
 };
 
+const groupIntegerDigits = (value: string) => {
+  const normalized = value.replace(/^0+(?=\d)/, '');
+  return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+export const formatPtBrNumberWhileTyping = (value: string, maximumFractionDigits = 3) => {
+  const text = String(value ?? '').trim().replace(/\s/g, '');
+  if (!text) return '';
+
+  const sign = text.startsWith('-') ? '-' : '';
+  const unsigned = text.replace(/^[+-]/, '');
+  let integerDigits = '';
+  let fractionDigits = '';
+  let hasDecimalSeparator = false;
+
+  const commaIndex = unsigned.indexOf(',');
+  if (commaIndex >= 0) {
+    integerDigits = unsigned.slice(0, commaIndex).replace(/\D/g, '');
+    fractionDigits = unsigned.slice(commaIndex + 1).replace(/\D/g, '');
+    hasDecimalSeparator = true;
+  } else {
+    const dotParts = unsigned.split('.');
+    const hasSingleDecimalDot = dotParts.length === 2 && (
+      dotParts[1] === '' ||
+      dotParts[1].length < 3 ||
+      (dotParts[0].replace(/\D/g, '') === '0' && dotParts[1].length <= maximumFractionDigits)
+    );
+
+    if (hasSingleDecimalDot) {
+      integerDigits = dotParts[0].replace(/\D/g, '');
+      fractionDigits = dotParts[1].replace(/\D/g, '');
+      hasDecimalSeparator = true;
+    } else {
+      integerDigits = unsigned.replace(/\D/g, '');
+    }
+  }
+
+  if (!integerDigits && !hasDecimalSeparator) return '';
+  const integerPart = groupIntegerDigits(integerDigits || '0');
+  const fractionPart = fractionDigits.slice(0, Math.max(0, maximumFractionDigits));
+  return `${sign}${integerPart}${hasDecimalSeparator ? `,${fractionPart}` : ''}`;
+};
+
 export const formatPtBrNumberInput = (value: string, maximumFractionDigits = 3) => {
   if (!value.trim()) return '';
   const parsed = parsePtBrNumber(value);
