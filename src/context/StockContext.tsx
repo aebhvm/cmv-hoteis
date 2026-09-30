@@ -84,6 +84,16 @@ const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
   return insumo.categoria === SETOR_CAFE ? SETOR_CAFE : SETOR_RESTAURANTE;
 };
 
+export const aplicarReposicoesAoEstoque = (
+  estoque: Insumo[],
+  reposicoes: Map<string, number>
+) => estoque.map(insumo => {
+  const quantidade = reposicoes.get(insumo.id);
+  return quantidade === undefined
+    ? insumo
+    : { ...insumo, estoqueAtual: insumo.estoqueAtual + quantidade };
+});
+
 type AppStateSnapshot = {
   currentUnit: Unidade;
   user: UserProfile;
@@ -1172,27 +1182,34 @@ useEffect(() => {
     return { success: true as const, estoqueFinal, movimentos, custoTotalInsumos };
   };
 
-  const getEstoqueComVendaRestaurada = (venda: VendaLog) => {
-    const estoqueRestaurado = allInsumos.map(insumo => ({ ...insumo }));
+  const getReposicoesDaVenda = (venda: VendaLog) => {
+    const reposicoes = new Map<string, number>();
     const movimentos = getMovimentosDaVenda(venda.id);
 
     if (movimentos.length > 0) {
       movimentos.forEach(movimento => {
-        const insumo = estoqueRestaurado.find(item => item.id === movimento.insumoId);
-        if (insumo) insumo.estoqueAtual += movimento.quantidade;
+        reposicoes.set(
+          movimento.insumoId,
+          (reposicoes.get(movimento.insumoId) || 0) + movimento.quantidade
+        );
       });
-      return estoqueRestaurado;
+      return reposicoes;
     }
 
     const ficha = allFichas.find(item => item.id === venda.fichaId);
     ficha?.ingredientes.forEach(ingrediente => {
-      const insumo = estoqueRestaurado.find(item => item.id === ingrediente.insumoId);
-      if (insumo) {
-        insumo.estoqueAtual +=
-          (ingrediente.quantidade / (ficha.rendimentoPorcoes || 1)) * venda.quantidade;
-      }
+      const quantidade =
+        (ingrediente.quantidade / (ficha.rendimentoPorcoes || 1)) * venda.quantidade;
+      reposicoes.set(
+        ingrediente.insumoId,
+        (reposicoes.get(ingrediente.insumoId) || 0) + quantidade
+      );
     });
-    return estoqueRestaurado;
+    return reposicoes;
+  };
+
+  const getEstoqueComVendaRestaurada = (venda: VendaLog) => {
+    return aplicarReposicoesAoEstoque(allInsumos, getReposicoesDaVenda(venda));
   };
 
   // O faturamento usa o saldo combinado do mesmo insumo nos dois setores.
@@ -1242,12 +1259,8 @@ useEffect(() => {
   };
 
   const restoreVendaEstoque = (venda: VendaLog) => {
-    const estoqueRestaurado = getEstoqueComVendaRestaurada(venda);
-    const saldos = new Map(estoqueRestaurado.map(insumo => [insumo.id, insumo.estoqueAtual]));
-    setAllInsumos(prev => prev.map(insumo => ({
-      ...insumo,
-      estoqueAtual: saldos.get(insumo.id) ?? insumo.estoqueAtual
-    })));
+    const reposicoes = getReposicoesDaVenda(venda);
+    setAllInsumos(prev => aplicarReposicoesAoEstoque(prev, reposicoes));
   };
 
   const updateVenda = (id: string, fichaId: string, quantidade: number, data?: string) => {

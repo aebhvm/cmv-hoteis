@@ -70,6 +70,9 @@ const normalizeInsumoNome = (nome: string) => nome
 const getInsumoStockKey = (insumo: Pick<Insumo, 'nome' | 'unidadeMedida'>) =>
   `${normalizeInsumoNome(insumo.nome)}::${insumo.unidadeMedida}`;
 
+export const getAvailablePortionCount = (value: number) =>
+  Math.floor(Math.max(0, value) + 1e-8);
+
 const getFichaEstoqueStatus = (
   ficha: FichaTecnica,
   insumosById: Map<string, Insumo>,
@@ -111,7 +114,8 @@ const getFichaEstoqueStatus = (
     if (disponibilidade + 1e-8 < 1) insumosFaltantes.add(necessidade.nome);
   });
 
-  const maxVendasDisponiveis = Math.floor(estoquePossivel === Infinity ? 0 : estoquePossivel);
+  const estoquePossivelNormalizado = estoquePossivel === Infinity ? 0 : estoquePossivel;
+  const maxVendasDisponiveis = getAvailablePortionCount(estoquePossivelNormalizado);
   return {
     maxVendasDisponiveis,
     esgotado: maxVendasDisponiveis <= 0,
