@@ -17,20 +17,22 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isRegister, setIsRegister] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
 
     if (isRegister) {
-      if (!nome || !email || !password || !estabelecimento) {
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!nome || !normalizedEmail || !password || !estabelecimento) {
         setError('Por favor, preencha todos os campos obrigatórios.');
         return;
       }
 
       // Check if email already exists
-      const emailExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
+      const emailExists = users.some(u => u.email.trim().toLowerCase() === normalizedEmail);
       if (emailExists) {
         setError('Este e-mail de usuário já está cadastrado.');
         return;
@@ -39,7 +41,7 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
       // Register new user
       registerUser({
         nome,
-        email,
+        email: normalizedEmail,
         cargo,
         estabelecimento,
         metaFCP: 30, // Default target FCP
@@ -54,21 +56,50 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
     }
 
     // Login process
-    if (!email || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
       setError('Por favor, preencha usuário (e-mail) e senha.');
       return;
     }
 
-    const foundUser = users.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.senha === password
-    );
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+      const result = await response.json().catch(() => ({})) as {
+        user?: typeof users[number];
+        error?: string;
+      };
 
-    if (foundUser) {
-      setCurrentUnit(foundUser.estabelecimento as 'AeB Villa Mayor' | 'VM Cumbuco');
-      updateUser(foundUser);
-      onLoginSuccess();
-    } else {
-      setError('Usuário (e-mail) ou senha inválidos.');
+      if (response.ok && result.user) {
+        setCurrentUnit(result.user.estabelecimento as 'AeB Villa Mayor' | 'VM Cumbuco');
+        updateUser(result.user);
+        onLoginSuccess();
+        return;
+      }
+
+      if (response.status === 401 || response.status === 400) {
+        setError('Usuário (e-mail) ou senha inválidos.');
+        return;
+      }
+
+      throw new Error(result.error || 'Authentication unavailable');
+    } catch {
+      const localUser = users.find(
+        u => u.email.trim().toLowerCase() === normalizedEmail && u.senha === password
+      );
+      if (localUser) {
+        setCurrentUnit(localUser.estabelecimento as 'AeB Villa Mayor' | 'VM Cumbuco');
+        updateUser(localUser);
+        onLoginSuccess();
+      } else {
+        setError('Não foi possível validar o acesso agora. Verifique sua conexão e tente novamente.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -245,11 +276,12 @@ export const AuthSim: React.FC<AuthSimProps> = ({ onLoginSuccess }) => {
 
           <button
             type="submit"
-            className="w-full mt-2 py-2.5 px-4 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-md shadow-brand-navy/10 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+            disabled={isSubmitting}
+            className="w-full mt-2 py-2.5 px-4 bg-brand-navy hover:bg-brand-navy/90 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-md shadow-brand-navy/10 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer disabled:cursor-wait disabled:opacity-70"
             id="auth-submit-btn"
           >
             <LogIn className="w-4 h-4 stroke-[2.5]" />
-            <span>{isRegister ? 'Cadastrar e Salvar' : 'Entrar no Sistema'}</span>
+            <span>{isSubmitting ? 'Validando acesso…' : isRegister ? 'Cadastrar e Salvar' : 'Entrar no Sistema'}</span>
           </button>
 
           <div className="text-center pt-2">
