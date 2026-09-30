@@ -42,7 +42,7 @@ const formatMonthLabel = (monthKey: string) => {
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, addMovimentacao } = useStock();
+  const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, addMovimentacao, remoteLoadStatus } = useStock();
   const mesAtual = toMonthKey(new Date().toISOString());
   const [mesSelecionado, setMesSelecionado] = React.useState(mesAtual);
 
@@ -212,10 +212,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200/60">
-            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-xs font-semibold text-slate-600 font-mono">
-              Sincronizado: {new Date().toLocaleDateString('pt-BR')}
+          <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border ${remoteLoadStatus === 'ready' ? 'bg-slate-50 border-slate-200/60' : 'bg-amber-50 border-amber-200'}`}>
+            <div className={`w-2.5 h-2.5 rounded-full ${remoteLoadStatus === 'ready' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <span className={`text-xs font-semibold font-mono ${remoteLoadStatus === 'ready' ? 'text-slate-600' : 'text-amber-800'}`}>
+              {remoteLoadStatus === 'ready' ? 'Dados sincronizados' : 'Dados locais — sem atualização'}
             </span>
           </div>
           <label className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/60">

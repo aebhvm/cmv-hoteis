@@ -10,6 +10,7 @@ import {
 
 interface StockContextType {
   user: UserProfile;
+  remoteLoadStatus: 'loading' | 'ready' | 'error';
   currentUnit: 'AeB Villa Mayor' | 'VM Cumbuco';
   setCurrentUnit: (unit: 'AeB Villa Mayor' | 'VM Cumbuco') => void;
   insumos: Insumo[];
@@ -481,9 +482,6 @@ useEffect(() => {
     let active = true;
 
     const loadRemoteState = async () => {
-      // A slow remote read must not leave the app unusable. The local snapshot
-      // remains visible while the remote state is loaded in the background.
-      setRemoteLoadStatus('ready');
       try {
         const metaResponse = await fetchWithTimeout('/api/state?meta=1', { headers: { 'cache-control': 'no-cache' } }, REMOTE_META_TIMEOUT_MS);
         if (!metaResponse.ok) throw new Error('Remote state unavailable');
@@ -536,6 +534,7 @@ useEffect(() => {
         setAllUtensilios(mergedSnapshot.allUtensilios);
         setAllMovimentacoesUtensilios(mergedSnapshot.allMovimentacoesUtensilios);
         remoteStateReadyRef.current = true;
+        setRemoteLoadStatus('ready');
       } catch {
         if (active) setRemoteLoadStatus('error');
         // Keep local data for offline use. It must not overwrite the remote state.
@@ -1437,6 +1436,7 @@ useEffect(() => {
   return (
     <StockContext.Provider value={{
       user,
+      remoteLoadStatus,
       currentUnit,
       setCurrentUnit,
       insumos,
