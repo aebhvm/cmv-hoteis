@@ -140,6 +140,13 @@ export const Movimentacoes: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const editScrollPositionRef = useRef<{
+    container: HTMLElement | null;
+    top: number;
+    left: number;
+    windowX: number;
+    windowY: number;
+  } | null>(null);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const normalizeSearch = (value: string) =>
     value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -158,6 +165,20 @@ export const Movimentacoes: React.FC = () => {
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [editingMovId, showForm]);
+
+  useEffect(() => {
+    if (editingMovId || !editScrollPositionRef.current) return;
+    const position = editScrollPositionRef.current;
+    editScrollPositionRef.current = null;
+    const frame = window.requestAnimationFrame(() => {
+      if (position.container) {
+        position.container.scrollTop = position.top;
+        position.container.scrollLeft = position.left;
+      }
+      window.scrollTo(position.windowX, position.windowY);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingMovId]);
 
   useEffect(() => {
     setVisibleMovementsLimit(INITIAL_VISIBLE_MOVEMENTS);
@@ -289,7 +310,9 @@ export const Movimentacoes: React.FC = () => {
     setSetorMovimentacao(setorAtivo === 'Todos' ? SETOR_RESTAURANTE : setorAtivo);
     setErrorMsg('');
     setSuccessMsg(editingMovId ? 'Movimentacao atualizada com sucesso!' : 'Movimentacao registrada com sucesso!');
-    window.requestAnimationFrame(() => productSearchRef.current?.focus());
+    if (!wasEditing) {
+      window.requestAnimationFrame(() => productSearchRef.current?.focus());
+    }
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
@@ -324,6 +347,14 @@ export const Movimentacoes: React.FC = () => {
       ? mov.estoqueFinal ?? insumosById.get(mov.insumoId)?.estoqueAtual ?? Math.max(0, mov.quantidade)
       : mov.quantidade;
 
+    const container = document.getElementById('view-container');
+    editScrollPositionRef.current = {
+      container,
+      top: container?.scrollTop ?? 0,
+      left: container?.scrollLeft ?? 0,
+      windowX: window.scrollX,
+      windowY: window.scrollY,
+    };
     setEditingMovId(id);
     setInsumoId(mov.insumoId);
     setInsumoSearchTerm(insumosById.get(mov.insumoId)?.nome || mov.insumoNome);
