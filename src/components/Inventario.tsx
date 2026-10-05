@@ -34,6 +34,19 @@ export const Inventario: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [setorAtivo, setSetorAtivo] = useState<'Todos' | SetorEstoque>('Todos');
+  const [dataAuditoria, setDataAuditoria] = useState(() => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Fortaleza', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date());
+    const part = (type: string) => parts.find(item => item.type === type)?.value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+  });
+  const dataAuditoriaIso = /^\d{4}-\d{2}-\d{2}$/.test(dataAuditoria)
+    ? new Date(`${dataAuditoria}T12:00:00-03:00`)
+    : null;
+  const dataAuditoriaValida = dataAuditoriaIso !== null
+    && !Number.isNaN(dataAuditoriaIso.getTime())
+    && dataAuditoriaIso.toISOString().slice(0, 10) === dataAuditoria;
 
   // Estado das contagens físicas inseridas pelo usuário
   const [contagensFisicas, setContagensFisicas] = useState<{ [id: string]: string }>({});
@@ -58,7 +71,7 @@ export const Inventario: React.FC = () => {
 
   // Ajustar o estoque com base na contagem física informada (Salvar linha a linha)
   const aplicarAjusteIndividual = (id: string) => {
-    if (isColaborador) return;
+    if (isColaborador || !dataAuditoriaValida || !dataAuditoriaIso) return;
 
     const ins = insumos.find(i => i.id === id);
     const contagemStr = contagensFisicas[id];
@@ -82,6 +95,7 @@ export const Inventario: React.FC = () => {
     addMovimentacao({
       insumoId: id,
       tipo: 'ajuste',
+      data: dataAuditoriaIso.toISOString(),
       quantidade: contagemVal,
       estoqueFisico: contagemVal,
       custoUnitario: ins.custoMedio,
@@ -105,7 +119,7 @@ export const Inventario: React.FC = () => {
 
   // Aplicar todos os ajustes que têm valores digitados
   const ajustarTodos = () => {
-    if (isColaborador) return;
+    if (isColaborador || !dataAuditoriaValida) return;
 
     let alterados = 0;
     Object.keys(contagensFisicas).forEach(id => {
@@ -148,6 +162,7 @@ export const Inventario: React.FC = () => {
         {Object.keys(contagensFisicas).length > 0 && !isColaborador && (
           <button
             onClick={ajustarTodos}
+            disabled={!dataAuditoriaValida}
             className="px-4 py-2 bg-brand-navy hover:bg-brand-navy/90 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-sm cursor-pointer transition-colors"
           >
             <ClipboardCheck className="w-4 h-4 stroke-[2]" />
@@ -198,6 +213,24 @@ export const Inventario: React.FC = () => {
       </div>
 
       {/* Caixa de Busca e Filtros */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <label htmlFor="data-auditoria" className="block text-xs font-semibold text-slate-700 mb-2">Data da auditoria</label>
+        <input
+          id="data-auditoria"
+          type="date"
+          required
+          value={dataAuditoria}
+          onChange={(e) => setDataAuditoria(e.target.value)}
+          aria-invalid={!dataAuditoriaValida}
+          aria-describedby="data-auditoria-ajuda"
+          className="w-full sm:w-auto px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
+        />
+        <p id="data-auditoria-ajuda" className={`mt-2 text-xs ${dataAuditoriaValida ? 'text-slate-500' : 'text-rose-600'}`}>
+          {dataAuditoriaValida
+            ? 'Os ajustes serão registrados nesta data. O estoque exibido corresponde ao saldo atual.'
+            : 'Selecione uma data válida para salvar os ajustes.'}
+        </p>
+      </div>
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex-1 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -331,10 +364,10 @@ export const Inventario: React.FC = () => {
                         </span>
                       ) : (
                         <button
-                          disabled={!temDigitacao}
+                          disabled={!temDigitacao || !dataAuditoriaValida}
                           onClick={() => aplicarAjusteIndividual(ins.id)}
                           className={`px-3 py-1 text-[10px] font-bold rounded-lg cursor-pointer transition-colors ${
-                            temDigitacao 
+                            temDigitacao && dataAuditoriaValida
                               ? 'bg-brand-navy hover:bg-brand-navy/90 text-white shadow-sm' 
                               : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                           }`}
