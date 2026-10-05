@@ -432,7 +432,6 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [currentUnit]);
 
   useEffect(() => {
-    if (user.cargo !== 'Colaborador') return;
     const assignedUnit: Unidade = UNIDADE_ATIVA;
     if (currentUnit !== assignedUnit) setCurrentUnitState(assignedUnit);
   }, [user.cargo, user.estabelecimento, currentUnit]);
@@ -524,7 +523,7 @@ useEffect(() => {
         if (data._revision) safeSetStorage(REMOTE_REVISION_STORAGE_KEY, data._revision);
         safeSetStorage(REMOTE_FINGERPRINT_STORAGE_KEY, getSnapshotFingerprint(mergedSnapshot));
         const hasActiveSession = sessionStorage.getItem('chef_is_logged_in') === 'true';
-        if (!hasActiveSession) setCurrentUnitState(mergedSnapshot.currentUnit);
+        if (!hasActiveSession) setCurrentUnitState(UNIDADE_ATIVA);
         if (!hasActiveSession) setUser(mergedSnapshot.user);
         setUsers(mergedSnapshot.users);
         setAllInsumos(mergedSnapshot.allInsumos);
@@ -1368,7 +1367,7 @@ useEffect(() => {
       remoteBaseStateRef.current = snapshot;
       latestSnapshotRef.current = snapshot;
       remoteStateReadyRef.current = true;
-      setCurrentUnitState(snapshot.currentUnit);
+      setCurrentUnitState(UNIDADE_ATIVA);
       setUser(snapshot.user);
       setUsers(snapshot.users);
       setAllInsumos(snapshot.allInsumos);
@@ -1387,7 +1386,7 @@ useEffect(() => {
   const importarDados = (jsonString: string): boolean => {
     try {
       const data = JSON.parse(jsonString);
-      if (data.currentUnit) setCurrentUnitState(data.currentUnit);
+      setCurrentUnitState(UNIDADE_ATIVA);
       if (data.user) setUser(data.user);
       if (Array.isArray(data.users)) setUsers(data.users);
 

@@ -76,7 +76,7 @@ function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('chef_dark_mode') === 'true');
   
-  const { user, insumos, currentUnit, setCurrentUnit } = useStock();
+  const { user, insumos, currentUnit } = useStock();
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
@@ -203,24 +203,9 @@ function AppContent() {
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
             Unidade Ativa F&B
           </label>
-          <div className="relative">
-            <select
-              value={currentUnit}
-              disabled={user.cargo === 'Colaborador'}
-              onChange={(e) => {
-                setCurrentUnit(e.target.value as 'AeB Villa Mayor' | 'VM Cumbuco');
-              }}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 cursor-pointer appearance-none pr-8 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              <option value="AeB Villa Mayor">🏨 AeB Villa Mayor</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
-              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-              </svg>
-            </div>
+          <div className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-sm">
+            🏨 {currentUnit}
           </div>
-          <p className="mt-2 text-[10px] font-semibold text-amber-700">VM Cumbuco temporariamente pausado para reduzir o carregamento.</p>
         </div>
 
         {/* Informações da Sessão do Usuário */}
@@ -298,7 +283,7 @@ function AppContent() {
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500">Unidade:</span>
             <span className="text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-              {user.estabelecimento}
+              {currentUnit}
             </span>
           </div>
 
