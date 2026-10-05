@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { Insumo, FichaTecnica, Movimentacao, VendaLog, UserProfile, Utensilio, MovimentacaoUtensilio, SetorEstoque } from '../types';
 import {
   INITIAL_USER,
@@ -239,13 +239,17 @@ type StatePatch = Partial<Pick<AppStateSnapshot, 'currentUnit' | 'user'>> & {
   allMovimentacoesUtensilios?: CollectionPatch;
 };
 
-const statesMatch = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+const statesMatch = (left: unknown, right: unknown) => left === right || JSON.stringify(left) === JSON.stringify(right);
+const snapshotsMatch = (left: AppStateSnapshot | null, right: AppStateSnapshot | null) =>
+  left === right || Boolean(left && right && (Object.keys(left) as Array<keyof AppStateSnapshot>)
+    .every(key => left[key] === right[key]));
 const entityKey = (item: any) => {
   const baseKey = String(item?.id || item?.email || '');
   return item?.unidade ? baseKey + '::' + String(item.unidade) : baseKey;
 };
 
 const buildCollectionPatch = (base: any[], next: any[]): CollectionPatch | undefined => {
+  if (base === next) return undefined;
   const baseByKey = new Map(base.map(item => [entityKey(item), item]));
   const nextByKey = new Map(next.map(item => [entityKey(item), item]));
   const upserts = next.filter(item => !statesMatch(baseByKey.get(entityKey(item)), item));
@@ -465,12 +469,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [allMovimentacoesUtensilios]);
 
 
+  const snapshotInsumos = useMemo(() => dedupeInsumosById(allInsumos), [allInsumos]);
+  const snapshotFichas = useMemo(() => dedupeAutomaticPicoleFichas(allFichas), [allFichas]);
   const buildSnapshot = (): AppStateSnapshot => ({
     currentUnit,
     user,
     users,
-    allInsumos: dedupeInsumosById(allInsumos),
-    allFichas: dedupeAutomaticPicoleFichas(allFichas),
+    allInsumos: snapshotInsumos,
+    allFichas: snapshotFichas,
     allMovimentacoes,
     allVendas,
     allUtensilios,
@@ -563,10 +569,17 @@ useEffect(() => {
       const base = remoteBaseStateRef.current;
       if (!snapshot || !base) return;
 
-      if (getSnapshotFingerprint(snapshot) === getSnapshotFingerprint(base)) return;
+      if (snapshotsMatch(snapshot, base)) {
+        setSyncStatus('saved');
+        return;
+      }
 
       const patch = buildStatePatch(base, snapshot);
-      if (!hasPatchChanges(patch)) return;
+      if (!hasPatchChanges(patch)) {
+        remoteBaseStateRef.current = snapshot;
+        setSyncStatus('saved');
+        return;
+      }
 
       syncInFlightRef.current = true;
       let saved = false;
@@ -574,15 +587,15 @@ useEffect(() => {
         let response = await fetch('/api/state', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ patch, revision: remoteRevisionRef.current })
+          body: JSON.stringify({ patch, revision: remoteRevisionRef.current, revisionOnly: true })
         });
         if (response.status === 409) {
           const conflict = await response.json();
-          remoteRevisionRef.current = conflict.state?._revision || null;
+          remoteRevisionRef.current = conflict._revision || conflict.state?._revision || null;
           response = await fetch('/api/state', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ patch, revision: remoteRevisionRef.current, returnState: true })
+            body: JSON.stringify({ patch, revision: remoteRevisionRef.current, revisionOnly: true })
           });
         }
 
@@ -598,20 +611,20 @@ useEffect(() => {
         // Reload must read the complete server state, including other sessions.
         localStorage.removeItem(REMOTE_FINGERPRINT_STORAGE_KEY);
         saved = true;
-        setSyncStatus(statesMatch(snapshot, latestSnapshotRef.current) ? 'saved' : 'pending');
+        setSyncStatus(snapshotsMatch(snapshot, latestSnapshotRef.current) ? 'saved' : 'pending');
       } catch (error) {
         setSyncStatus('error');
         console.error('Unable to save changes.', error);
       } finally {
         syncInFlightRef.current = false;
-        if (saved && (syncQueuedRef.current || !statesMatch(snapshot, latestSnapshotRef.current))) {
+        if (saved && (syncQueuedRef.current || !snapshotsMatch(snapshot, latestSnapshotRef.current))) {
           syncQueuedRef.current = false;
           void syncChanges();
         }
       }
     };
 
-    if (!statesMatch(remoteBaseStateRef.current, latestSnapshotRef.current)) setSyncStatus('pending');
+    if (!snapshotsMatch(remoteBaseStateRef.current, latestSnapshotRef.current)) setSyncStatus('pending');
     const timer = window.setTimeout(() => {
       void syncChanges();
     }, SYNC_DEBOUNCE_MS);
@@ -621,7 +634,7 @@ useEffect(() => {
 
   useEffect(() => {
     const warnPending = (event: BeforeUnloadEvent) => {
-      if (!remoteStateReadyRef.current || statesMatch(remoteBaseStateRef.current, latestSnapshotRef.current)) return;
+      if (!remoteStateReadyRef.current || snapshotsMatch(remoteBaseStateRef.current, latestSnapshotRef.current)) return;
       event.preventDefault();
       event.returnValue = '';
     };

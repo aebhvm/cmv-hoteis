@@ -71,38 +71,32 @@ const ensureSchema = async (sql: ReturnType<typeof neon>) => {
 
   await sql`
     CREATE OR REPLACE FUNCTION cmv_merge_json_collection(current_items jsonb, collection_patch jsonb)
-    RETURNS jsonb LANGUAGE plpgsql IMMUTABLE AS $function$
-    DECLARE
-      item jsonb;
-      replacement jsonb;
-      item_key text;
-      result jsonb := '[]'::jsonb;
-    BEGIN
-      FOR item IN SELECT value FROM jsonb_array_elements(COALESCE(current_items, '[]'::jsonb)) LOOP
-        item_key := cmv_entity_key(item);
-        replacement := NULL;
-        SELECT candidate INTO replacement
-        FROM jsonb_array_elements(COALESCE(collection_patch->'upserts', '[]'::jsonb)) AS candidate
-        WHERE cmv_entity_key(candidate) = item_key
-        LIMIT 1;
-        IF NOT EXISTS (
-          SELECT 1 FROM jsonb_array_elements(COALESCE(collection_patch->'deleted', '[]'::jsonb)) AS deleted_item
-          WHERE deleted_item #>> '{}' = item_key
-        ) THEN
-          result := result || jsonb_build_array(COALESCE(replacement, item));
-        END IF;
-      END LOOP;
-      FOR item IN SELECT value FROM jsonb_array_elements(COALESCE(collection_patch->'upserts', '[]'::jsonb)) LOOP
-        item_key := cmv_entity_key(item);
-        IF item_key <> '' AND NOT EXISTS (
-          SELECT 1 FROM jsonb_array_elements(COALESCE(current_items, '[]'::jsonb)) AS existing_item
-          WHERE cmv_entity_key(existing_item) = item_key
-        ) THEN
-          result := result || jsonb_build_array(item);
-        END IF;
-      END LOOP;
-      RETURN result;
-    END;
+    RETURNS jsonb LANGUAGE sql IMMUTABLE AS $function$
+      WITH existing AS MATERIALIZED (
+        SELECT value AS item, ordinality AS position, cmv_entity_key(value) AS item_key
+        FROM jsonb_array_elements(COALESCE(current_items, '[]'::jsonb)) WITH ORDINALITY
+      ), patch_items AS MATERIALIZED (
+        SELECT value AS item, ordinality AS position, cmv_entity_key(value) AS item_key
+        FROM jsonb_array_elements(COALESCE(collection_patch->'upserts', '[]'::jsonb)) WITH ORDINALITY
+      ), replacements AS (
+        SELECT DISTINCT ON (item_key) item_key, item
+        FROM patch_items ORDER BY item_key, position
+      ), deleted AS (
+        SELECT DISTINCT value #>> '{}' AS item_key
+        FROM jsonb_array_elements(COALESCE(collection_patch->'deleted', '[]'::jsonb))
+      ), merged AS (
+        SELECT COALESCE(replacements.item, existing.item) AS item, 0 AS group_order, existing.position
+        FROM existing
+        LEFT JOIN replacements USING (item_key)
+        LEFT JOIN deleted USING (item_key)
+        WHERE deleted.item_key IS NULL
+        UNION ALL
+        SELECT patch_items.item, 1 AS group_order, patch_items.position
+        FROM patch_items
+        LEFT JOIN (SELECT DISTINCT item_key FROM existing) AS existing_keys USING (item_key)
+        WHERE existing_keys.item_key IS NULL AND patch_items.item_key <> ''
+      )
+      SELECT COALESCE(jsonb_agg(item ORDER BY group_order, position), '[]'::jsonb) FROM merged;
     $function$`;
 
   await sql`
@@ -307,7 +301,7 @@ export default async function handler(req: any, res: any) {
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         if (body.revision === undefined) {
-          const conflictRows = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+          const conflictRows = await sql`SELECT revision, CASE WHEN ${body.revisionOnly === true} THEN NULL ELSE data END AS data FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
           if (conflictRows.length === 0) {
             await sql`
               INSERT INTO app_state (id, data)
@@ -318,7 +312,9 @@ export default async function handler(req: any, res: any) {
           }
           return res.status(409).json({
             error: 'State conflict.',
-            state: { ...normalizeState(conflictRows[0].data), _revision: String(conflictRows[0].revision) }
+            ...(body.revisionOnly === true
+              ? { _revision: String(conflictRows[0].revision) }
+              : { state: { ...normalizeState(conflictRows[0].data), _revision: String(conflictRows[0].revision) } })
           });
         }
 
@@ -342,7 +338,7 @@ export default async function handler(req: any, res: any) {
           return res.status(200).json({ ok: true, _revision: savedRevision });
         }
 
-        const conflictRows = await sql`SELECT data, revision FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
+        const conflictRows = await sql`SELECT revision, CASE WHEN ${body.revisionOnly === true} THEN NULL ELSE data END AS data FROM app_state WHERE id = ${APP_STATE_ID} LIMIT 1`;
         if (conflictRows.length === 0) {
           await sql`
             INSERT INTO app_state (id, data)
@@ -353,7 +349,9 @@ export default async function handler(req: any, res: any) {
         }
         return res.status(409).json({
           error: 'State conflict.',
-          state: { ...normalizeState(conflictRows[0].data), _revision: String(conflictRows[0].revision) }
+          ...(body.revisionOnly === true
+            ? { _revision: String(conflictRows[0].revision) }
+            : { state: { ...normalizeState(conflictRows[0].data), _revision: String(conflictRows[0].revision) } })
         });
       }
 
