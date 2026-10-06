@@ -834,7 +834,17 @@ useEffect(() => {
       estoqueFinal: movData.tipo === 'ajuste' ? estoqueFinalAjustado : undefined,
     };
 
+    // Alguns ajustes antigos podem ter sido corrigidos diretamente no cadastro
+    // do insumo. Nesse caso, desfazer novamente a diferença legada inflada
+    // deixaria o estoque negativo ao salvar a correção do histórico.
+    const estoqueJaRefleteAjusteAtual = mesmoInsumo
+      && original.tipo === 'ajuste'
+      && updatedMov.tipo === 'ajuste'
+      && estoqueFinalAjustado !== undefined
+      && Math.abs(insumoNovo.estoqueAtual - estoqueFinalAjustado) <= 1e-8;
+
     const estoquePrevisto = allInsumos.map(ins => {
+      if (estoqueJaRefleteAjusteAtual && ins.id === updatedMov.insumoId) return ins;
       let estoqueAtual = ins.estoqueAtual;
       if (ins.id === original.insumoId) estoqueAtual += getMovimentoEstoqueDelta(original, true);
       if (ins.id === updatedMov.insumoId) estoqueAtual += getMovimentoEstoqueDelta(updatedMov);

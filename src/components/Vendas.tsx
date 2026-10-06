@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { FichaTecnica, Insumo } from '../types';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
-import { formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
+import { formatPtBrNumberInput, formatPtBrNumberWhileTyping, parsePtBrNumber } from '../utils/numberInput';
 import {
   AlertTriangle,
   CalendarDays,
@@ -491,7 +491,7 @@ export const Vendas: React.FC = () => {
                   autoFocus
                   required
                   value={quantidadeVenda}
-                  onChange={(event) => setQuantidadeVenda(event.target.value)}
+                  onChange={(event) => setQuantidadeVenda(formatPtBrNumberWhileTyping(event.target.value, 0))}
                   onBlur={(event) => setQuantidadeVenda(formatPtBrNumberInput(event.target.value, 0))}
                   className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/10"
                   placeholder="Qtd"

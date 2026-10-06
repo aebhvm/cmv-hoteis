@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import { Utensilio } from '../types';
-import { formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
+import { formatPtBrNumberInput, formatPtBrNumberWhileTyping, parsePtBrNumber } from '../utils/numberInput';
 import writeExcelFile from 'write-excel-file/browser';
 
 const categories = ['Copos', 'Talheres', 'Pratos', 'Travessas', 'Outros'];
@@ -305,10 +305,10 @@ export const Utensilios: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block text-xs font-semibold text-slate-600">Quantidade inicial
-                  <input required min="0" step="any" type="text" inputMode="decimal" value={form.quantidadeAtual} onChange={e => setForm({ ...form, quantidadeAtual: e.target.value })} onBlur={e => setForm({ ...form, quantidadeAtual: formatPtBrNumberInput(e.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+                  <input required min="0" step="any" type="text" inputMode="decimal" value={form.quantidadeAtual} onChange={e => setForm({ ...form, quantidadeAtual: formatPtBrNumberWhileTyping(e.target.value) })} onBlur={e => setForm({ ...form, quantidadeAtual: formatPtBrNumberInput(e.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">Estoque mínimo
-                  <input required min="0" step="any" type="text" inputMode="decimal" value={form.estoqueMinimo} onChange={e => setForm({ ...form, estoqueMinimo: e.target.value })} onBlur={e => setForm({ ...form, estoqueMinimo: formatPtBrNumberInput(e.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+                  <input required min="0" step="any" type="text" inputMode="decimal" value={form.estoqueMinimo} onChange={e => setForm({ ...form, estoqueMinimo: formatPtBrNumberWhileTyping(e.target.value) })} onBlur={e => setForm({ ...form, estoqueMinimo: formatPtBrNumberInput(e.target.value) })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
                 </label>
               </div>
               <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-navy px-3 py-2.5 text-xs font-bold text-white transition-colors hover:bg-brand-navy/90">
@@ -329,7 +329,7 @@ export const Utensilios: React.FC = () => {
                 <option value="">Selecione o utensílio</option>
                 {utensilios.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
-              <input required min="0" step="any" type="text" inputMode="decimal" value={contagem} onChange={e => setContagem(e.target.value)} onBlur={e => setContagem(formatPtBrNumberInput(e.target.value))} placeholder="Quantidade encontrada" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+              <input required min="0" step="any" type="text" inputMode="decimal" value={contagem} onChange={e => setContagem(formatPtBrNumberWhileTyping(e.target.value))} onBlur={e => setContagem(formatPtBrNumberInput(e.target.value))} placeholder="Quantidade encontrada" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <input value={contagemObservacao} onChange={e => setContagemObservacao(e.target.value)} placeholder="Observação (opcional)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <button type="submit" disabled={!utensilios.length} className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">Salvar contagem</button>
             </div>
@@ -345,7 +345,7 @@ export const Utensilios: React.FC = () => {
                 <option value="">Selecione o utensílio</option>
                 {utensilios.map(item => <option key={item.id} value={item.id}>{item.nome} ({formatNumber(item.quantidadeAtual)} disponíveis)</option>)}
               </select>
-              <input required min="0.01" step="any" type="text" inputMode="decimal" value={perda} onChange={e => setPerda(e.target.value)} onBlur={e => setPerda(formatPtBrNumberInput(e.target.value))} placeholder="Quantidade perdida" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
+              <input required min="0.01" step="any" type="text" inputMode="decimal" value={perda} onChange={e => setPerda(formatPtBrNumberWhileTyping(e.target.value))} onBlur={e => setPerda(formatPtBrNumberInput(e.target.value))} placeholder="Quantidade perdida" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <input value={perdaObservacao} onChange={e => setPerdaObservacao(e.target.value)} placeholder="Motivo (opcional)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800" />
               <button type="submit" disabled={!utensilios.length} className="w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-800 disabled:cursor-not-allowed disabled:opacity-50">Salvar perda</button>
             </div>

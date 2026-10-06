@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { Insumo, SetorEstoque } from '../types';
-import { formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
+import { formatPtBrNumberInput, formatPtBrNumberWhileTyping, parsePtBrNumber } from '../utils/numberInput';
 import { 
   ClipboardCheck, 
   Search, 
@@ -306,7 +306,7 @@ export const Inventario: React.FC = () => {
                             placeholder={isColaborador ? "Restrito" : "Contagem"}
                             disabled={isColaborador}
                             value={contagemFisicaDig}
-                            onChange={(e) => handleContagemChange(ins.id, e.target.value)}
+                            onChange={(e) => handleContagemChange(ins.id, formatPtBrNumberWhileTyping(e.target.value))}
                             onBlur={(e) => handleContagemChange(ins.id, formatPtBrNumberInput(e.target.value))}
                             className={`w-full text-right pr-9 pl-3 py-1 bg-white border rounded-lg text-slate-850 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 ${
                               isColaborador 

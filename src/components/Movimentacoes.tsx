@@ -371,6 +371,13 @@ export const Movimentacoes: React.FC = () => {
     setShowForm(true);
   }, [insumosById, isColaborador, movimentacoesById]);
 
+  const usarEstoqueAtualNoAjuste = () => {
+    if (tipo !== 'ajuste' || !editingMovId || !insumoId) return;
+    const estoqueAtual = insumosById.get(insumoId)?.estoqueAtual;
+    if (estoqueAtual === undefined) return;
+    setQuantidade(formatPtBrNumberInput(estoqueAtual));
+  };
+
   const handleDeleteMov = useCallback((id: string) => {
     const mov = movimentacoesById.get(id);
     if (!mov) return;
@@ -795,6 +802,15 @@ export const Movimentacoes: React.FC = () => {
                   <span className="mt-1 block text-[9px] font-medium text-slate-400">
                     Estoque teórico atual: {formatQuantity(insumosById.get(insumoId)?.estoqueAtual ?? 0)}
                   </span>
+                )}
+                {tipo === 'ajuste' && editingMovId && insumoId && (
+                  <button
+                    type="button"
+                    onClick={usarEstoqueAtualNoAjuste}
+                    className="mt-1 text-[10px] font-semibold text-brand-navy underline underline-offset-2 hover:text-brand-navy/70"
+                  >
+                    Usar estoque atual do cadastro
+                  </button>
                 )}
               </div>
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
-import { formatPtBrCurrencyInput, formatPtBrNumberInput, parsePtBrNumber } from '../utils/numberInput';
+import { formatPtBrCurrencyInput, formatPtBrNumberInput, formatPtBrNumberWhileTyping, parsePtBrNumber } from '../utils/numberInput';
 import { FichaTecnica, IngredienteFicha, Insumo } from '../types';
 import { 
   Plus, 
@@ -396,7 +396,7 @@ export const FichasTecnicas: React.FC = () => {
                   inputMode="decimal"
                   step="any"
                   value={precoVenda}
-                  onChange={(e) => setPrecoVenda(e.target.value)}
+                  onChange={(e) => setPrecoVenda(formatPtBrNumberWhileTyping(e.target.value, 2))}
                   onBlur={(e) => setPrecoVenda(formatPtBrCurrencyInput(e.target.value))}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/10 font-mono"
                   placeholder="R$ 0.00"
