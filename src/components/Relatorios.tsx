@@ -3,6 +3,7 @@ import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
 import readExcelFile from 'read-excel-file/browser';
 import writeExcelFile from 'write-excel-file/browser';
+import { parsePtBrNumber } from '../utils/numberInput';
 import { 
   BarChart4, 
   Download, 
@@ -33,7 +34,7 @@ const USUARIO_HEADERS = ['id', 'nome', 'email', 'cargo', 'estabelecimento', 'met
 const toNumber = (value: unknown, fallback = 0) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
   if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value.replace(',', '.'));
+    const parsed = parsePtBrNumber(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
   return fallback;

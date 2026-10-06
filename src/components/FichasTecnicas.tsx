@@ -89,8 +89,8 @@ export const FichasTecnicas: React.FC = () => {
     setNome(f.nome);
     setCategoria(f.categoria);
     setDescricao(f.descricao || '');
-    setPrecoVenda(f.precoVenda.toString());
-    setRendimentoPorcoes(f.rendimentoPorcoes.toString());
+    setPrecoVenda(formatPtBrCurrencyInput(f.precoVenda));
+    setRendimentoPorcoes(formatPtBrNumberInput(f.rendimentoPorcoes, 0));
     setIngredientesEscolhidos([...f.ingredientes]);
     setSelectedInsumoId('');
     setInsumoSearchTerm('');
@@ -161,10 +161,10 @@ export const FichasTecnicas: React.FC = () => {
 
     if ((ins.unidadeMedida === 'kg' || ins.unidadeMedida === 'L') && ing.quantidade < 1) {
       setUnidadeInserida('sub');
-      setQuantidadeInput((ing.quantidade * 1000).toString());
+      setQuantidadeInput(formatPtBrNumberInput(ing.quantidade * 1000));
     } else {
       setUnidadeInserida('principal');
-      setQuantidadeInput(ing.quantidade.toString());
+      setQuantidadeInput(formatPtBrNumberInput(ing.quantidade));
     }
 
     setErrorMsg('');

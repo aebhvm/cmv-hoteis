@@ -239,7 +239,7 @@ export const Movimentacoes: React.FC = () => {
     setInsumoId(ins.id);
     setInsumoSearchTerm(ins.nome);
     setSetorMovimentacao(getInsumoSetor(ins));
-    setCustoUnitario(formatPtBrCurrencyInput(ins.custoMedio.toString()));
+    setCustoUnitario(formatPtBrCurrencyInput(ins.custoMedio));
     setSuggestionIndex(-1);
     setShowInsumoSugestoes(false);
   };
@@ -361,10 +361,10 @@ export const Movimentacoes: React.FC = () => {
     setSetorMovimentacao(getMovimentacaoSetor(mov));
     setShowInsumoSugestoes(false);
     setTipo(mov.tipo);
-    setQuantidade(formatPtBrNumberInput(quantidadeEdicao.toString()));
+    setQuantidade(formatPtBrNumberInput(quantidadeEdicao));
     setCustoUnitario(mov.custoUnitario === undefined
       ? ''
-      : formatPtBrCurrencyInput(mov.custoUnitario.toString()));
+      : formatPtBrCurrencyInput(mov.custoUnitario));
     setObservacao(mov.observacao || '');
     setErrorMsg('');
     setDataMovimentacao(toLocalDateKey(mov.data));

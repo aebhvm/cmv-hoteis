@@ -119,13 +119,13 @@ export const Insumos: React.FC<InsumosProps> = ({ setorInicial }) => {
     setUnidadeMedida(ins.unidadeMedida);
     setValorEmbalagem(ins.valorEmbalagem === undefined
       ? ''
-      : formatPtBrCurrencyInput(ins.valorEmbalagem.toString()));
+      : formatPtBrCurrencyInput(ins.valorEmbalagem));
     setConteudoEmbalagem(ins.conteudoEmbalagem === undefined
       ? ''
-      : formatPtBrNumberInput(ins.conteudoEmbalagem.toString()));
+      : formatPtBrNumberInput(ins.conteudoEmbalagem));
     setCustoMedio(ins.custoMedio.toString());
-    setEstoqueAtual(formatPtBrNumberInput(ins.estoqueAtual.toString()));
-    setEstoqueMinimo(formatPtBrNumberInput(ins.estoqueMinimo.toString()));
+    setEstoqueAtual(formatPtBrNumberInput(ins.estoqueAtual));
+    setEstoqueMinimo(formatPtBrNumberInput(ins.estoqueMinimo));
     setFornecedor(ins.fornecedor || '');
     setValidade(ins.validade || '');
     setErrorMsg('');

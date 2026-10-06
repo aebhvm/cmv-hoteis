@@ -232,7 +232,7 @@ export const Vendas: React.FC = () => {
     if (!venda) return;
     setEditingVendaId(id);
     setSelectedFichaId(venda.fichaId);
-    setQuantidadeVenda(venda.quantidade.toString());
+    setQuantidadeVenda(formatPtBrNumberInput(venda.quantidade, 0));
     setDataLancamento(getDateInputValue(venda.data) || getTodayDateInputValue());
     setErrorMsg('');
     setSuccessMsg('');
