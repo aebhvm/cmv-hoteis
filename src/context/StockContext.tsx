@@ -85,6 +85,16 @@ const getInsumoSetor = (insumo: Insumo): SetorEstoque => {
   return insumo.categoria === SETOR_CAFE ? SETOR_CAFE : SETOR_RESTAURANTE;
 };
 
+const normalizeInsumoNome = (nome: string) => nome
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+const getInsumoStockKey = (insumo: Pick<Insumo, 'nome' | 'unidadeMedida'>) =>
+  `${normalizeInsumoNome(insumo.nome)}::${insumo.unidadeMedida}`;
+
 export const aplicarReposicoesAoEstoque = (
   estoque: Insumo[],
   reposicoes: Map<string, number>
@@ -643,12 +653,30 @@ useEffect(() => {
   }, []);
 
   // Derived filtered state for current unit
-  const insumos = allInsumos.filter(i => i.unidade === currentUnit);
-  const fichas = allFichas.filter(f => f.unidade === currentUnit && !f.excluida);
-  const movimentacoes = allMovimentacoes.filter(m => m.unidade === currentUnit);
-  const vendas = allVendas.filter(v => v.unidade === currentUnit);
-  const utensilios = allUtensilios.filter(u => u.unidade === currentUnit);
-  const movimentacoesUtensilios = allMovimentacoesUtensilios.filter(m => m.unidade === currentUnit);
+  const insumos = useMemo(() => allInsumos.filter(i => i.unidade === currentUnit), [allInsumos, currentUnit]);
+  const fichas = useMemo(() => allFichas.filter(f => f.unidade === currentUnit && !f.excluida), [allFichas, currentUnit]);
+  const movimentacoes = useMemo(() => allMovimentacoes.filter(m => m.unidade === currentUnit), [allMovimentacoes, currentUnit]);
+  const vendas = useMemo(() => allVendas.filter(v => v.unidade === currentUnit), [allVendas, currentUnit]);
+  const utensilios = useMemo(() => allUtensilios.filter(u => u.unidade === currentUnit), [allUtensilios, currentUnit]);
+  const movimentacoesUtensilios = useMemo(
+    () => allMovimentacoesUtensilios.filter(m => m.unidade === currentUnit),
+    [allMovimentacoesUtensilios, currentUnit]
+  );
+  const insumosById = useMemo(
+    () => new Map(allInsumos.map(insumo => [insumo.id, insumo])),
+    [allInsumos]
+  );
+  const insumosByStockKey = useMemo(() => {
+    const grouped = new Map<string, Insumo[]>();
+    allInsumos.forEach(insumo => {
+      if (insumo.unidade !== currentUnit) return;
+      const key = getInsumoStockKey(insumo);
+      const candidates = grouped.get(key);
+      if (candidates) candidates.push(insumo);
+      else grouped.set(key, [insumo]);
+    });
+    return grouped;
+  }, [allInsumos, currentUnit]);
 
   const setCurrentUnit = (unit: 'AeB Villa Mayor' | 'VM Cumbuco') => {
     if (unit === UNIDADE_ATIVA) setCurrentUnitState(unit);
@@ -1086,13 +1114,6 @@ useEffect(() => {
     ));
   };
 
-  const normalizeInsumoNome = (nome: string) => nome
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-
   const getMovimentosDaVenda = (saleId: string) => allMovimentacoes.filter(mov =>
     (!mov.unidade || mov.unidade === currentUnit) &&
     (mov.id.startsWith(`${saleId}-`) || mov.observacao?.includes(`[venda:${saleId}]`))
@@ -1113,7 +1134,7 @@ useEffect(() => {
     const ingredientesSemCadastro: string[] = [];
 
     ficha.ingredientes.forEach(ingrediente => {
-      const insumoReferencia = estoqueInicial.find(insumo => insumo.id === ingrediente.insumoId);
+      const insumoReferencia = insumosById.get(ingrediente.insumoId);
       if (!insumoReferencia) {
         ingredientesSemCadastro.push(ingrediente.insumoId);
         return;
@@ -1137,13 +1158,8 @@ useEffect(() => {
     const movimentosPorInsumo = new Map<string, Movimentacao>();
 
     necessidades.forEach(necessidade => {
-      const nomeNormalizado = normalizeInsumoNome(necessidade.nome);
-      const candidatos = estoqueInicial.filter(insumo =>
-        insumo.unidade === currentUnit &&
-        insumo.unidadeMedida === necessidade.unidadeMedida &&
-        normalizeInsumoNome(insumo.nome) === nomeNormalizado &&
-        (estoqueFinal.get(insumo.id) || 0) > 0
-      );
+      const candidatos = (insumosByStockKey.get(getInsumoStockKey(necessidade)) || [])
+        .filter(insumo => (estoqueFinal.get(insumo.id) || 0) > 0);
       const disponivel = candidatos.reduce(
         (total, insumo) => total + (estoqueFinal.get(insumo.id) || 0),
         0

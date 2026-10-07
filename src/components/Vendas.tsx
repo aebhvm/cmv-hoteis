@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { FichaTecnica, Insumo } from '../types';
 import { useStock } from '../context/StockContext';
 import { formatMoney } from '../utils/formatMoney';
@@ -16,6 +16,17 @@ import {
 } from 'lucide-react';
 
 const BRASILIA_TIME_ZONE = 'America/Sao_Paulo';
+const BRASILIA_MONTH_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BRASILIA_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+});
+const BRASILIA_DATE_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: BRASILIA_TIME_ZONE,
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
 
 const formatDateInputValue = (date: Date) => {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -43,11 +54,7 @@ const dateInputToIso = (value: string) => {
 };
 
 const getBrasiliaMonthKey = (value: string) => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: BRASILIA_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-  }).formatToParts(new Date(value));
+  const parts = BRASILIA_MONTH_FORMATTER.formatToParts(new Date(value));
   const year = parts.find(part => part.type === 'year')?.value;
   const month = parts.find(part => part.type === 'month')?.value;
   return year && month ? `${year}-${month}` : '';
@@ -69,6 +76,12 @@ const normalizeInsumoNome = (nome: string) => nome
 
 const getInsumoStockKey = (insumo: Pick<Insumo, 'nome' | 'unidadeMedida'>) =>
   `${normalizeInsumoNome(insumo.nome)}::${insumo.unidadeMedida}`;
+
+const normalizeSearchText = (value: string) => value
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .trim();
 
 export const getAvailablePortionCount = (value: number) =>
   Math.floor(Math.max(0, value) + 1e-8);
@@ -125,12 +138,18 @@ const getFichaEstoqueStatus = (
 
 export const Vendas: React.FC = () => {
   const { fichas, registrarVenda, updateVenda, deleteVenda, vendas, insumos } = useStock();
-  const insumosById = new Map<string, Insumo>(insumos.map(insumo => [insumo.id, insumo]));
-  const saldoPorNomeUnidade = new Map<string, number>();
-  insumos.forEach(insumo => {
-    const key = getInsumoStockKey(insumo);
-    saldoPorNomeUnidade.set(key, (saldoPorNomeUnidade.get(key) || 0) + insumo.estoqueAtual);
-  });
+  const insumosById = useMemo(
+    () => new Map<string, Insumo>(insumos.map(insumo => [insumo.id, insumo])),
+    [insumos]
+  );
+  const saldoPorNomeUnidade = useMemo(() => {
+    const saldo = new Map<string, number>();
+    insumos.forEach(insumo => {
+      const key = getInsumoStockKey(insumo);
+      saldo.set(key, (saldo.get(key) || 0) + insumo.estoqueAtual);
+    });
+    return saldo;
+  }, [insumos]);
 
   const [selectedFichaId, setSelectedFichaId] = useState<string | null>(null);
   const [quantidadeVenda, setQuantidadeVenda] = useState('0');
@@ -142,37 +161,63 @@ export const Vendas: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
 
   const mesAtual = getBrasiliaMonthKey(new Date().toISOString());
-  const mesesDisponiveis: string[] = Array.from(new Set<string>([
+  const vendaPresentationById = useMemo(() => {
+    const presentation = new Map<string, { monthKey: string; timestamp: number; dateLabel: string }>();
+    vendas.forEach(venda => {
+      const date = new Date(venda.data);
+      const timestamp = date.getTime();
+      presentation.set(venda.id, {
+        monthKey: getBrasiliaMonthKey(venda.data),
+        timestamp: Number.isFinite(timestamp) ? timestamp : 0,
+        dateLabel: Number.isFinite(timestamp) ? BRASILIA_DATE_FORMATTER.format(date) : 'Data inválida',
+      });
+    });
+    return presentation;
+  }, [vendas]);
+  const mesesDisponiveis: string[] = useMemo(() => Array.from(new Set<string>([
     mesAtual,
-    ...vendas.map(venda => getBrasiliaMonthKey(venda.data)),
-  ].filter(Boolean))).sort((a, b) => b.localeCompare(a));
-  const vendasDoPeriodo = periodoSelecionado === 'todos'
-    ? vendas
-    : vendas.filter(venda => getBrasiliaMonthKey(venda.data) === periodoSelecionado);
-  const vendasFiltradas = [...vendasDoPeriodo].sort((a, b) => {
-    const dataA = new Date(a.data).getTime();
-    const dataB = new Date(b.data).getTime();
-    return (Number.isFinite(dataB) ? dataB : 0) - (Number.isFinite(dataA) ? dataA : 0);
-  });
-  const faturamentoFiltrado = vendasFiltradas.reduce((acc, venda) => acc + venda.receitaTotal, 0);
-  const custoInsumosFiltrado = vendasFiltradas.reduce((acc, venda) => acc + venda.custoInsumosTotal, 0);
+    ...vendas.map(venda => vendaPresentationById.get(venda.id)?.monthKey || ''),
+  ].filter(Boolean))).sort((a, b) => b.localeCompare(a)), [mesAtual, vendaPresentationById]);
+  const vendasFiltradas = useMemo(() => {
+    const vendasDoPeriodo = periodoSelecionado === 'todos'
+      ? vendas
+      : vendas.filter(venda => vendaPresentationById.get(venda.id)?.monthKey === periodoSelecionado);
+    return [...vendasDoPeriodo].sort((a, b) =>
+      (vendaPresentationById.get(b.id)?.timestamp || 0) - (vendaPresentationById.get(a.id)?.timestamp || 0)
+    );
+  }, [periodoSelecionado, vendaPresentationById, vendas]);
+  const resumoFaturamento = useMemo(() => {
+    let faturamento = 0;
+    let custoInsumos = 0;
+    vendasFiltradas.forEach(venda => {
+      faturamento += venda.receitaTotal;
+      custoInsumos += venda.custoInsumosTotal;
+    });
+    return { faturamento, custoInsumos };
+  }, [vendasFiltradas]);
+  const faturamentoFiltrado = resumoFaturamento.faturamento;
+  const custoInsumosFiltrado = resumoFaturamento.custoInsumos;
   const lucroFiltrado = faturamentoFiltrado - custoInsumosFiltrado;
   const periodoLabel = periodoSelecionado === 'todos'
     ? 'Todos os meses'
     : formatMonthLabel(periodoSelecionado);
 
-  const normalizeText = (value: string) => value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-
-  const normalizedSearch = normalizeText(searchTerm);
-  const filteredFichas = fichas.filter(ficha => {
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const normalizedSearch = normalizeSearchText(deferredSearchTerm);
+  const fichaEstoqueStatusById = useMemo(() => new Map(
+    fichas.map(ficha => [
+      ficha.id,
+      getFichaEstoqueStatus(ficha, insumosById, saldoPorNomeUnidade),
+    ])
+  ), [fichas, insumosById, saldoPorNomeUnidade]);
+  const filteredFichas = useMemo(() => fichas.filter(ficha => {
     if (!normalizedSearch) return true;
-    return normalizeText(`${ficha.nome} ${ficha.descricao || ''} ${ficha.categoria}`).includes(normalizedSearch);
-  });
-  const selectedFicha = fichas.find(ficha => ficha.id === selectedFichaId);
+    return normalizeSearchText(`${ficha.nome} ${ficha.descricao || ''} ${ficha.categoria}`).includes(normalizedSearch);
+  }), [fichas, normalizedSearch]);
+  const selectedFicha = useMemo(
+    () => fichas.find(ficha => ficha.id === selectedFichaId),
+    [fichas, selectedFichaId]
+  );
 
   const closeVendaModal = () => {
     setSelectedFichaId(null);
@@ -316,8 +361,11 @@ export const Vendas: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" id="cardapio-vendas-grid">
               {filteredFichas.map(ficha => {
-                const { maxVendasDisponiveis, esgotado, insumosFaltantes } =
-                  getFichaEstoqueStatus(ficha, insumosById, saldoPorNomeUnidade);
+                const { maxVendasDisponiveis, esgotado, insumosFaltantes } = fichaEstoqueStatusById.get(ficha.id) || {
+                  maxVendasDisponiveis: 0,
+                  esgotado: true,
+                  insumosFaltantes: ['estoque indisponível'],
+                };
 
                 return (
                   <button
@@ -562,7 +610,7 @@ export const Vendas: React.FC = () => {
                   return (
                     <tr key={venda.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-4 font-mono text-slate-400">
-                        {new Date(venda.data).toLocaleDateString('pt-BR', { timeZone: BRASILIA_TIME_ZONE, day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        {vendaPresentationById.get(venda.id)?.dateLabel || 'Data inválida'}
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-800">{venda.fichaNome}</td>
                       <td className="py-3 px-4 text-right font-mono font-medium">{venda.quantidade}x</td>
