@@ -344,8 +344,8 @@ const applyStatePatchToSnapshot = (remote: AppStateSnapshot, patch: StatePatch):
 });
 
 const snapshotFromRemote = (state: any): AppStateSnapshot => ({
-  currentUnit: state.currentUnit,
-  user: state.user,
+  currentUnit: UNIDADE_ATIVA,
+  user: { ...(state.user || INITIAL_USER), estabelecimento: UNIDADE_ATIVA },
   users: state.users,
   allInsumos: dedupeInsumosById(state.allInsumos || []),
   allFichas: state.allFichas || [],
@@ -678,12 +678,12 @@ useEffect(() => {
     return grouped;
   }, [allInsumos, currentUnit]);
 
-  const setCurrentUnit = (unit: 'AeB Villa Mayor' | 'VM Cumbuco') => {
-    if (unit === UNIDADE_ATIVA) setCurrentUnitState(unit);
+  const setCurrentUnit = (_unit: 'AeB Villa Mayor' | 'VM Cumbuco') => {
+    setCurrentUnitState(UNIDADE_ATIVA);
   };
 
   const updateUser = (profile: Partial<UserProfile>) => {
-    setUser(prev => ({ ...prev, ...profile }));
+    setUser(prev => ({ ...prev, ...profile, estabelecimento: UNIDADE_ATIVA }));
   };
 
   const addInsumo = (insumoData: Omit<Insumo, 'id'>) => {

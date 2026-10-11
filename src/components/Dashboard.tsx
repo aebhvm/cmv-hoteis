@@ -42,7 +42,7 @@ const formatMonthLabel = (monthKey: string) => {
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const { insumos, vendas, movimentacoes, user, getFichaCusto, fichas, addMovimentacao, remoteLoadStatus } = useStock();
+  const { insumos, vendas, movimentacoes, user, currentUnit, getFichaCusto, fichas, addMovimentacao, remoteLoadStatus } = useStock();
   const mesAtual = toMonthKey(new Date().toISOString());
   const [mesSelecionado, setMesSelecionado] = React.useState(mesAtual);
 
@@ -206,7 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <span className="text-xs font-bold text-brand-navy uppercase tracking-widest">Painel Gerencial</span>
-          <h2 className="text-2xl font-black text-slate-800 mt-1">{user.estabelecimento}</h2>
+          <h2 className="text-2xl font-black text-slate-800 mt-1">{currentUnit}</h2>
           <p className="text-sm text-slate-500 mt-1">
             Olá, <strong className="text-slate-700">{user.nome}</strong>. Acompanhe a eficiência operacional e margens do seu estoque.
           </p>
