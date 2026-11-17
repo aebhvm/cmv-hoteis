@@ -7,7 +7,7 @@ import { formatMoney } from '../utils/formatMoney';
 const REPORT_TIME_ZONE = 'America/Sao_Paulo';
 const TOLERANCE = 1e-8;
 
-type PeriodPreset = 'todos' | 'mes' | '30dias' | 'personalizado';
+type PeriodPreset = 'todos' | 'mes' | '30dias' | 'dia' | 'mes-especifico' | 'personalizado';
 type StatusFilter = 'todos' | 'com-entrada' | 'sem-entrada' | 'consumo-maior' | 'saldo-positivo' | 'equilibrado';
 
 type ReconciliationRow = {
@@ -64,6 +64,13 @@ const getDaysAgoKey = (days: number) => {
 const getMonthStartKey = () => {
   const parts = dateParts(new Date());
   return `${parts.year}-${parts.month}-01`;
+};
+
+const getMonthEndKey = (monthKey: string) => {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) return '';
+  const [year, month] = monthKey.split('-').map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${monthKey}-${String(lastDay).padStart(2, '0')}`;
 };
 
 const formatQuantity = (value: number) => Number(value || 0).toLocaleString('pt-BR', {
@@ -134,6 +141,8 @@ const addRow = (rows: Map<string, ReconciliationRow>, insumo: Insumo) => {
 export const EntradasVsVendas: React.FC = () => {
   const { insumos, movimentacoes, vendas, fichas } = useStock();
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('todos');
+  const [selectedDay, setSelectedDay] = useState(getTodayKey);
+  const [selectedMonth, setSelectedMonth] = useState(() => getTodayKey().slice(0, 7));
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -142,9 +151,11 @@ export const EntradasVsVendas: React.FC = () => {
   const period = useMemo(() => {
     if (periodPreset === 'mes') return { start: getMonthStartKey(), end: getTodayKey() };
     if (periodPreset === '30dias') return { start: getDaysAgoKey(29), end: getTodayKey() };
+    if (periodPreset === 'dia') return { start: selectedDay, end: selectedDay };
+    if (periodPreset === 'mes-especifico') return { start: `${selectedMonth}-01`, end: getMonthEndKey(selectedMonth) };
     if (periodPreset === 'personalizado') return { start: startDate, end: endDate };
     return { start: '', end: '' };
-  }, [endDate, periodPreset, startDate]);
+  }, [endDate, periodPreset, selectedDay, selectedMonth, startDate]);
 
   const insumosById = useMemo(() => new Map(insumos.map(insumo => [insumo.id, insumo])), [insumos]);
   const fichasById = useMemo(() => new Map(fichas.map(ficha => [ficha.id, ficha])), [fichas]);
@@ -291,6 +302,8 @@ export const EntradasVsVendas: React.FC = () => {
               <option value="todos">Todo o histórico</option>
               <option value="mes">Este mês</option>
               <option value="30dias">Últimos 30 dias</option>
+              <option value="dia">Dia específico</option>
+              <option value="mes-especifico">Mês específico</option>
               <option value="personalizado">Período personalizado</option>
             </select>
           </label>
@@ -310,7 +323,11 @@ export const EntradasVsVendas: React.FC = () => {
             <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Nome do insumo" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" />
             {searchTerm && <button type="button" onClick={() => setSearchTerm('')} className="absolute right-2 top-7 rounded p-1 text-slate-400 hover:text-slate-700" aria-label="Limpar busca"><X className="h-4 w-4" /></button>}
           </label>
-          {periodPreset === 'personalizado' ? (
+          {periodPreset === 'dia' ? (
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Dia selecionado<input type="date" value={selectedDay} onChange={event => setSelectedDay(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
+          ) : periodPreset === 'mes-especifico' ? (
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mês selecionado<input type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
+          ) : periodPreset === 'personalizado' ? (
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">De<input type="date" value={startDate} onChange={event => setStartDate(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Até<input type="date" value={endDate} onChange={event => setEndDate(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
