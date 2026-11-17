@@ -10,6 +10,7 @@ const Movimentacoes = lazy(() => import('./components/Movimentacoes').then(modul
 const Inventario = lazy(() => import('./components/Inventario').then(module => ({ default: module.Inventario })));
 const Utensilios = lazy(() => import('./components/Utensilios').then(module => ({ default: module.Utensilios })));
 const Vendas = lazy(() => import('./components/Vendas').then(module => ({ default: module.Vendas })));
+const EntradasVsVendas = lazy(() => import('./components/EntradasVsVendas').then(module => ({ default: module.EntradasVsVendas })));
 const Relatorios = lazy(() => import('./components/Relatorios').then(module => ({ default: module.Relatorios })));
 const Usuarios = lazy(() => import('./components/Usuarios').then(module => ({ default: module.Usuarios })));
 import { 
@@ -21,6 +22,7 @@ import {
   Utensils,
   Coffee,
   ShoppingCart, 
+  ArrowDownUp,
   BarChart4, 
   LogOut, 
   User, 
@@ -96,6 +98,7 @@ function AppContent() {
     { id: 'movimentacoes', label: 'Movimentações', icon: ArrowUpDown },
     { id: 'inventario', label: 'Inventário / Auditoria', icon: ClipboardCheck },
     { id: 'vendas', label: 'Faturamento / PDV', icon: ShoppingCart },
+    { id: 'entradas-vendas', label: 'Entradas x Vendas', icon: ArrowDownUp },
     { id: 'relatorios', label: 'Relatórios & Simulações', icon: BarChart4 },
     { id: 'usuarios', label: 'Usuários', icon: User },
   ];
@@ -151,6 +154,9 @@ function AppContent() {
         return <Utensilios />;
       case 'vendas':
         return <Vendas />;
+      case 'entradas-vendas':
+        if (user.cargo === 'Colaborador') return <Movimentacoes />;
+        return <EntradasVsVendas />;
       case 'relatorios':
         if (user.cargo === 'Colaborador') return <Movimentacoes />;
         return <Relatorios />;
