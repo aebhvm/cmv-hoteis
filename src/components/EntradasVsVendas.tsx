@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, BarChart3, CheckCircle2, Search, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, BarChart3, CalendarCheck, CalendarDays, CheckCircle2, Search, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { useStock } from '../context/StockContext';
 import type { Insumo } from '../types';
 import { formatMoney } from '../utils/formatMoney';
@@ -7,7 +7,6 @@ import { formatMoney } from '../utils/formatMoney';
 const REPORT_TIME_ZONE = 'America/Sao_Paulo';
 const TOLERANCE = 1e-8;
 
-type PeriodPreset = 'todos' | 'mes' | '30dias' | 'dia' | 'mes-especifico' | 'personalizado';
 type StatusFilter = 'todos' | 'com-entrada' | 'sem-entrada' | 'consumo-maior' | 'saldo-positivo' | 'equilibrado';
 
 type ReconciliationRow = {
@@ -54,23 +53,26 @@ const getTodayKey = () => {
   return `${parts.year}-${parts.month}-${parts.day}`;
 };
 
-const getDaysAgoKey = (days: number) => {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  const parts = dateParts(date);
-  return `${parts.year}-${parts.month}-${parts.day}`;
-};
-
-const getMonthStartKey = () => {
-  const parts = dateParts(new Date());
-  return `${parts.year}-${parts.month}-01`;
-};
-
-const getMonthEndKey = (monthKey: string) => {
-  if (!/^\d{4}-\d{2}$/.test(monthKey)) return '';
+const formatMonthLabel = (monthKey: string) => {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) return 'Todos os meses';
   const [year, month] = monthKey.split('-').map(Number);
-  const lastDay = new Date(year, month, 0).getDate();
-  return `${monthKey}-${String(lastDay).padStart(2, '0')}`;
+  const label = new Intl.DateTimeFormat('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, 1, 12));
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
+const formatDayLabel = (dateKey: string) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  if (!year || !month || !day) return dateKey;
+  const label = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day, 12));
+  return label.charAt(0).toUpperCase() + label.slice(1);
 };
 
 const formatQuantity = (value: number) => Number(value || 0).toLocaleString('pt-BR', {
@@ -87,10 +89,11 @@ const getUnitCost = (insumo: Insumo) => {
 
 const getQuantityCost = (insumo: Insumo, quantity: number) => getUnitCost(insumo) * quantity;
 
-const isInRange = (date: string, start: string, end: string) => {
+const matchesDateFilter = (date: string, monthFilter: string, dayFilter: string) => {
   const key = toDateKey(date);
   if (!key) return false;
-  return (!start || key >= start) && (!end || key <= end);
+  return (!monthFilter || monthFilter === 'todos' || key.slice(0, 7) === monthFilter)
+    && (!dayFilter || key === dayFilter);
 };
 
 const getRowStatus = (row: ReconciliationRow) => {
@@ -140,25 +143,27 @@ const addRow = (rows: Map<string, ReconciliationRow>, insumo: Insumo) => {
 
 export const EntradasVsVendas: React.FC = () => {
   const { insumos, movimentacoes, vendas, fichas } = useStock();
-  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('todos');
-  const [selectedDay, setSelectedDay] = useState(getTodayKey);
-  const [selectedMonth, setSelectedMonth] = useState(() => getTodayKey().slice(0, 7));
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [monthFilter, setMonthFilter] = useState(() => getTodayKey().slice(0, 7));
+  const [dayFilter, setDayFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
 
-  const period = useMemo(() => {
-    if (periodPreset === 'mes') return { start: getMonthStartKey(), end: getTodayKey() };
-    if (periodPreset === '30dias') return { start: getDaysAgoKey(29), end: getTodayKey() };
-    if (periodPreset === 'dia') return { start: selectedDay, end: selectedDay };
-    if (periodPreset === 'mes-especifico') return { start: `${selectedMonth}-01`, end: getMonthEndKey(selectedMonth) };
-    if (periodPreset === 'personalizado') return { start: startDate, end: endDate };
-    return { start: '', end: '' };
-  }, [endDate, periodPreset, selectedDay, selectedMonth, startDate]);
-
   const insumosById = useMemo(() => new Map(insumos.map(insumo => [insumo.id, insumo])), [insumos]);
   const fichasById = useMemo(() => new Map(fichas.map(ficha => [ficha.id, ficha])), [fichas]);
+  const availableMonths = useMemo(() => Array.from(new Set([
+    getTodayKey().slice(0, 7),
+    ...movimentacoes.map(item => toDateKey(item.data).slice(0, 7)),
+    ...vendas.map(item => toDateKey(item.data).slice(0, 7)),
+  ].filter(month => /^\d{4}-\d{2}$/.test(month)))).sort((a, b) => b.localeCompare(a)), [movimentacoes, vendas]);
+  const availableDays = useMemo(() => Array.from(new Set([
+    ...movimentacoes.map(item => toDateKey(item.data)),
+    ...vendas.map(item => toDateKey(item.data)),
+  ].filter(day => /^\d{4}-\d{2}-\d{2}$/.test(day) && (monthFilter === 'todos' || day.startsWith(monthFilter))))).sort((a, b) => b.localeCompare(a)), [monthFilter, movimentacoes, vendas]);
+
+  const handleMonthChange = (value: string) => {
+    setMonthFilter(value);
+    if (dayFilter && value !== 'todos' && !dayFilter.startsWith(value)) setDayFilter('');
+  };
 
   const analysis = useMemo(() => {
     const rows = new Map<string, ReconciliationRow>();
@@ -169,7 +174,7 @@ export const EntradasVsVendas: React.FC = () => {
     let ingredientesSemCadastro = 0;
 
     movimentacoes.forEach(movimentacao => {
-      if (movimentacao.tipo !== 'entrada' || !isInRange(movimentacao.data, period.start, period.end)) return;
+      if (movimentacao.tipo !== 'entrada' || !matchesDateFilter(movimentacao.data, monthFilter, dayFilter)) return;
       const insumo = insumosById.get(movimentacao.insumoId);
       if (!insumo) return;
       const row = addRow(rows, insumo);
@@ -181,7 +186,7 @@ export const EntradasVsVendas: React.FC = () => {
     });
 
     vendas.forEach(venda => {
-      if (!isInRange(venda.data, period.start, period.end)) return;
+      if (!matchesDateFilter(venda.data, monthFilter, dayFilter)) return;
       vendasCount += 1;
       receitaTotal += Number(venda.receitaTotal) || 0;
       const ficha = fichasById.get(venda.fichaId);
@@ -227,7 +232,7 @@ export const EntradasVsVendas: React.FC = () => {
       rowsWithConsumption,
       rowsWithEntry,
     };
-  }, [fichasById, insumosById, movimentacoes, period.end, period.start, vendas]);
+  }, [dayFilter, fichasById, insumosById, monthFilter, movimentacoes, vendas]);
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = normalizeSearch(searchTerm);
@@ -294,17 +299,20 @@ export const EntradasVsVendas: React.FC = () => {
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Filtros da análise">
-        <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500"><ArrowDownToLine className="h-4 w-4 text-brand-navy" /> Filtros da comparação</div>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_1fr_1.5fr]">
+        <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500"><ArrowDownToLine className="h-4 w-4 text-brand-navy" /> Direcionar análise por data</div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1.15fr_1.35fr_1fr_1.5fr]">
           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Período
-            <select value={periodPreset} onChange={event => setPeriodPreset(event.target.value as PeriodPreset)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10">
-              <option value="todos">Todo o histórico</option>
-              <option value="mes">Este mês</option>
-              <option value="30dias">Últimos 30 dias</option>
-              <option value="dia">Dia específico</option>
-              <option value="mes-especifico">Mês específico</option>
-              <option value="personalizado">Período personalizado</option>
+            <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-brand-navy" /> Mês</span>
+            <select value={monthFilter} onChange={event => handleMonthChange(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold capitalize text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10">
+              <option value="todos">Todos os meses</option>
+              {availableMonths.map(month => <option key={month} value={month}>{formatMonthLabel(month)}</option>)}
+            </select>
+          </label>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="flex items-center gap-1.5"><CalendarCheck className="h-3.5 w-3.5 text-brand-navy" /> Dia</span>
+            <select value={dayFilter} onChange={event => setDayFilter(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10">
+              <option value="">Todos os dias</option>
+              {availableDays.map(day => <option key={day} value={day}>{formatDayLabel(day)}</option>)}
             </select>
           </label>
           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -323,16 +331,12 @@ export const EntradasVsVendas: React.FC = () => {
             <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Nome do insumo" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" />
             {searchTerm && <button type="button" onClick={() => setSearchTerm('')} className="absolute right-2 top-7 rounded p-1 text-slate-400 hover:text-slate-700" aria-label="Limpar busca"><X className="h-4 w-4" /></button>}
           </label>
-          {periodPreset === 'dia' ? (
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Dia selecionado<input type="date" value={selectedDay} onChange={event => setSelectedDay(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
-          ) : periodPreset === 'mes-especifico' ? (
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mês selecionado<input type="month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
-          ) : periodPreset === 'personalizado' ? (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">De<input type="date" value={startDate} onChange={event => setStartDate(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Até<input type="date" value={endDate} onChange={event => setEndDate(event.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-navy/10" /></label>
-            </div>
-          ) : <div className="flex items-end text-[11px] text-slate-500">{period.start || period.end ? `${period.start} até ${period.end}` : 'Entradas e vendas de todo o histórico'}</div>}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+          <span className="font-bold text-slate-700">Período aplicado:</span>
+          <span>{monthFilter === 'todos' ? 'Todos os meses' : formatMonthLabel(monthFilter)}</span>
+          <span className="text-slate-300">·</span>
+          <span>{dayFilter ? formatDayLabel(dayFilter) : 'Todos os dias'}</span>
         </div>
       </section>
 
